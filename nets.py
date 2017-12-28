@@ -43,13 +43,21 @@ def netG(x, LOSS_METHOD, INSTANCE_NORM=True, PIXEL_SHUF=False):
    else: enc_conv3 = tcl.batch_norm(enc_conv3)
    enc_conv3 = relu(enc_conv3)
 
-   r1 = resblock(enc_conv3, 128, 'r1')
+   re = resblock(enc_conv3, 128, 'r1')
+   re = resblock(re, 128, 'r2')
+   re = resblock(re, 128, 'r3')
+   re = resblock(re, 128, 'r4')
+   re = resblock(re, 128, 'r5')
+   re = resblock(re, 128, 'r6')
+   re = resblock(re, 128, 'r7')
+   re = resblock(re, 128, 'r8')
+   re = resblock(re, 128, 'r9')
 
    print 'x:        ',x
    print 'enc_conv1:',enc_conv1
    print 'enc_conv2:',enc_conv2
    print 'enc_conv3:',enc_conv3
-   print 'r1:',r1
+   print 're:',re
    exit()
    print 'enc_conv2:',enc_conv2
    print 'enc_conv3:',enc_conv3
