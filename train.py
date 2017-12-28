@@ -35,7 +35,7 @@ if __name__ == '__main__':
    parser.add_argument('--BATCH_SIZE',    required=False,default=32,type=int,help='Batch size')
    parser.add_argument('--L1_WEIGHT',     required=False,default=100.,type=float,help='Weight for L1 loss')
    parser.add_argument('--IG_WEIGHT',     required=False,default=1.0,type=float,help='Weight for image gradient loss')
-   parser.add_argument('--NETWORK',       required=False,default='pix2pix',type=str,help='Network to use')
+   parser.add_argument('--NETWORK',       required=False,default='resnet',type=str,help='Network to use')
    parser.add_argument('--EPOCHS',        required=False,default=100,type=int,help='Number of epochs for GAN')
    parser.add_argument('--DATA',          required=False,default='underwater_imagenet',type=str,help='Dataset to use')
    a = parser.parse_args()
@@ -101,8 +101,9 @@ if __name__ == '__main__':
    #   mem = nvmlDeviceGetMemoryInfo(handle).free
    #   gpus.append(float(mem))
 
-   if NETWORK == 'pix2pix': from pix2pix import *
-   if NETWORK == 'resnet': from resnet import *
+   #if NETWORK == 'pix2pix': from pix2pix import *
+   #if NETWORK == 'resnet': from resnet import *
+   from nets import *
 
    # global step that is saved with a model to keep track of how many steps/epochs
    global_step = tf.Variable(0, name='global_step', trainable=False)
