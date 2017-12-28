@@ -75,11 +75,10 @@ def netG(x, LOSS_METHOD, INSTANCE_NORM=True, PIXEL_SHUF=False):
    if INSTANCE_NORM: out = instance_norm(out)
    dec_conv2 = relu(out)
    print 'out:',out
-   exit()
    return out
 
 
-def netD(x, LAYER_NORM, LOSS_METHOD, reuse=False):
+def netD(x, LOSS_METHOD, reuse=False):
    print
    print 'netD'
 
@@ -88,34 +87,40 @@ def netD(x, LAYER_NORM, LOSS_METHOD, reuse=False):
 
       conv1 = tcl.conv2d(x, 64, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_conv1')
       if LOSS_METHOD != 'wgan': conv1 = tcl.batch_norm(conv1)
-      elif LOSS_METHOD == 'wgan' and LAYER_NORM: conv1 = tcl.layer_norm(conv1)
       conv1 = lrelu(conv1)
+      print 'conv1:',conv1
       
       conv2 = tcl.conv2d(conv1, 128, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_conv2')
       if LOSS_METHOD != 'wgan': conv2 = tcl.batch_norm(conv2)
-      elif LOSS_METHOD == 'wgan' and LAYER_NORM: conv2 = tcl.layer_norm(conv2)
       conv2 = lrelu(conv2)
+      print 'conv2:',conv2
       
       conv3 = tcl.conv2d(conv2, 256, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_conv3')
       if LOSS_METHOD != 'wgan': conv3 = tcl.batch_norm(conv3)
-      elif LOSS_METHOD == 'wgan' and LAYER_NORM: conv3 = tcl.layer_norm(conv3)
       conv3 = lrelu(conv3)
-      
-      conv4 = tcl.conv2d(conv3, 512, 4, 1, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_conv4')
-      if LOSS_METHOD != 'wgan': conv4 = tcl.batch_norm(conv4)
-      elif LOSS_METHOD == 'wgan' and LAYER_NORM: conv4 = tcl.layer_norm(conv4)
-      conv4 = lrelu(conv4)
-      
-      conv5 = tcl.conv2d(conv4, 1, 1, 1, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_conv5')
-      if LOSS_METHOD != 'wgan': conv5 = tcl.batch_norm(conv5)
-      elif LOSS_METHOD == 'wgan' and LAYER_NORM: conv5 = tcl.layer_norm(conv5)
-
-      print 'x:',x
-      print 'conv1:',conv1
-      print 'conv2:',conv2
       print 'conv3:',conv3
+      
+      conv4 = tcl.conv2d(conv3, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_conv4')
+      if LOSS_METHOD != 'wgan': conv4 = tcl.batch_norm(conv4)
+      conv4 = lrelu(conv4)
       print 'conv4:',conv4
+     
+      conv5 = tcl.conv2d(conv4, 1024, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_conv5')
+      if LOSS_METHOD != 'wgan': conv5 = tcl.batch_norm(conv5)
+      conv5 = lrelu(conv5)
       print 'conv5:',conv5
-      return conv5
 
+      conv6 = tcl.conv2d(conv5, 2048, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_conv6')
+      if LOSS_METHOD != 'wgan': conv6 = tcl.batch_norm(conv6)
+      conv6 = lrelu(conv6)
+      print 'conv6:',conv6
 
+      # output the discriminator score, as well as the class prediction (
+      d_score = tcl.conv2d(conv6, 1, 4, 1, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_score')
+      d_class = tcl.conv2d(conv6, 2, 4, 1, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_class', padding='VALID')
+
+      # d_class is a conv output of size batchx1x1x2 -> flatten to be just a vector of length 2
+      d_class = tcl.flatten(d_class)
+      print 'd_score:',d_score
+      print 'd_class:',d_class
+      return d_score, d_class
