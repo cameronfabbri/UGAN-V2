@@ -26,7 +26,7 @@ sys.path.insert(0, 'ops/')
 sys.path.insert(0, 'nets/')
 
 from tf_ops import *
-import data_ops
+#import data_ops
 
 if __name__ == '__main__':
    parser = argparse.ArgumentParser()
