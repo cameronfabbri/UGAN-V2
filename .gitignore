@@ -1,0 +1,13 @@
+*.png
+*.jpg
+*checkpoint*
+checkpoints/*
+checkpoint/
+checkpoints/
+*.*~
+*.*swp
+*.*swo
+*.swp
+*.swo
+*.pyc
+*.pkl
