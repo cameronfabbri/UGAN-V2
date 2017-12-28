@@ -95,7 +95,7 @@ def ln(x, s, b, epsilon = 1e-5):
    Instance normalization
    https://arxiv.org/abs/1607.08022
 '''
-def instance_norm(x, epsilon=1e-5):
+def instance_norm(x, epsilon=1e-9):
    mean, var = tf.nn.moments(x, [1, 2], keep_dims=True)
    return tf.div(tf.subtract(x, mean), tf.sqrt(tf.add(var, epsilon)))
 

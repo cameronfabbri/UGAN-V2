@@ -14,7 +14,7 @@ import tensorflow as tf
 from tqdm import tqdm
 from scipy import misc
 import numpy as np
-from pynvml import *
+from nets import *
 import argparse
 import ntpath
 import sys
@@ -92,19 +92,6 @@ if __name__ == '__main__':
    print 'DATA:          ',DATA
    print
 
-   # pick the GPU with the most memory available
-   #nvmlInit()
-   #deviceCount = nvmlDeviceGetCount()
-   #gpus = []
-   #for i in range(deviceCount):
-   #   handle = nvmlDeviceGetHandleByIndex(i)
-   #   mem = nvmlDeviceGetMemoryInfo(handle).free
-   #   gpus.append(float(mem))
-
-   #if NETWORK == 'pix2pix': from pix2pix import *
-   #if NETWORK == 'resnet': from resnet import *
-   from nets import *
-
    # global step that is saved with a model to keep track of how many steps/epochs
    global_step = tf.Variable(0, name='global_step', trainable=False)
 
@@ -117,10 +104,10 @@ if __name__ == '__main__':
    # generated corrected colors
    gen_image = netG(image_u, LOSS_METHOD)
 
-   print 'here'
-   exit()
    # send 'above' water images to D
    D_real = netD(image_r, LOSS_METHOD)
+   print 'here'
+   exit()
 
    # send corrected underwater images to D
    D_fake = netD(gen_image, LOSS_METHOD, reuse=True)
