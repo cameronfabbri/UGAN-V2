@@ -6,16 +6,16 @@ sys.path.insert(0, 'ops/')
 from tf_ops import *
 
 
-def resblock(x, dim, ks=3, s=1, name):
+def resblock(x, dim, name, ks=3, s=1):
 
    p = int((ks - 1) / 2)
    x = tf.pad(x, [[0, 0], [p, p], [p, p], [0, 0]], "REFLECT")
-   
-   y = tcl.conv2d(x, dim, ks, s, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_res'+str(name), padding='VALID')
+ 
+   y = tcl.conv2d(x, dim, ks, s, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_res1'+str(name), padding='VALID')
    y = instance_norm(y)
    y = tf.pad(relu(y), [[0, 0], [p, p], [p, p], [0, 0]], "REFLECT")
    
-   y = tcl.conv2d(y, dim, ks, s, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_res'+str(name), padding='VALID')
+   y = tcl.conv2d(y, dim, ks, s, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_res2'+str(name), padding='VALID')
    y = instance_norm(y)
    
    return y + x 
