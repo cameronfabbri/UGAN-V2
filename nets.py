@@ -6,6 +6,20 @@ sys.path.insert(0, 'ops/')
 from tf_ops import *
 
 
+def resblock(x, dim, ks=3, s=1, name):
+
+   p = int((ks - 1) / 2)
+   x = tf.pad(x, [[0, 0], [p, p], [p, p], [0, 0]], "REFLECT")
+   
+   y = tcl.conv2d(x, dim, ks, s, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_res'+str(name), padding='VALID')
+   y = instance_norm(y)
+   y = tf.pad(relu(y), [[0, 0], [p, p], [p, p], [0, 0]], "REFLECT")
+   
+   y = tcl.conv2d(y, dim, ks, s, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_res'+str(name), padding='VALID')
+   y = instance_norm(y)
+   
+   return y + x 
+
 '''
    Architecture from https://arxiv.org/pdf/1703.10593.pdf
 '''
@@ -28,11 +42,14 @@ def netG(x, LOSS_METHOD, INSTANCE_NORM=True, PIXEL_SHUF=False):
    if INSTANCE_NORM: enc_conv3 = instance_norm(enc_conv3)
    else: enc_conv3 = tcl.batch_norm(enc_conv3)
    enc_conv3 = relu(enc_conv3)
-   
+
+   r1 = resblock(enc_conv3, 128, 'r1')
+
    print 'x:        ',x
    print 'enc_conv1:',enc_conv1
    print 'enc_conv2:',enc_conv2
    print 'enc_conv3:',enc_conv3
+   print 'r1:',r1
    exit()
    print 'enc_conv2:',enc_conv2
    print 'enc_conv3:',enc_conv3
