@@ -1,18 +1,15 @@
 '''
 
    Main training file
-
    The goal is to correct the colors in underwater images.
-   CycleGAN was used to create images that appear to be underwater.
-   Those will be sent into the generator, which will attempt to correct the
-   colors.
+   This is pretty much CycleWGAN with an auxiliary discriminator to predict class
 
 '''
 
 import cPickle as pickle
 import tensorflow as tf
-from tqdm import tqdm
 from scipy import misc
+from tqdm import tqdm
 import numpy as np
 from nets import *
 import argparse
@@ -125,7 +122,6 @@ if __name__ == '__main__':
       errD_fake = tf.nn.sigmoid(D_fake)
       errG = tf.reduce_mean(-tf.log(errD_fake + e))
       errD = tf.reduce_mean(-(tf.log(errD_real+e)+tf.log(1-errD_fake+e)))
-
    if LOSS_METHOD == 'wgan':
       # cost functions
       errD = tf.reduce_mean(D_real) - tf.reduce_mean(D_fake)
