@@ -24,7 +24,7 @@ import tf_ops
 if __name__ == '__main__':
 
    parser = argparse.ArgumentParser()
-   parser.add_argument('--batch_size', required=False, type=int, default=64,
+   parser.add_argument('--batch_size', required=False, type=int, default=32,
                         help='Batch size to use')
    parser.add_argument('--data_dir', required=True, type=str,
                         help='Directory where data is')
@@ -131,6 +131,9 @@ if __name__ == '__main__':
    x           = tf.placeholder(tf.float32, shape=(batch_size, 256, 256, 3), name='real_images')
    y           = tf.placeholder(tf.float32, shape=(batch_size, 2), name='y')
 
+   # lambda on the discriminator. Start at 0, and increase to 0.0001
+   d_lambda = tf.placeholder(tf.float32, name='d_lambda')
+
    # the embedding of the image - this is a dictionary of all layers
    enc = encoder(x)
    embedding = enc['embedding']
@@ -140,10 +143,10 @@ if __name__ == '__main__':
    # D's prediction on which class the embedding is
    logitsD = tf.nn.softmax(netD(embedding))
 
-   # loss on D - cross entropy with real class y
-   errD = -tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logitsD))
+   # loss on D - cross entropy with real class y - we want t maximize this
+   errD = tf.multiply(-tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logitsD)), d_lambda)
 
-   errG = tf.reduce_mean(tf.nn.l2_loss(x-decoded))
+   errG = lambda_ae*tf.reduce_mean(tf.nn.l2_loss(x-decoded))
 
    # tensorboard summaries
    tf.summary.scalar('d_loss', errD)
@@ -157,13 +160,8 @@ if __name__ == '__main__':
 
    train_op = tf.train.AdamOptimizer(learning_rate=0.0002).minimize(errG+errD)
 
-   # optimize G
-   #G_train_op = tf.train.AdamOptimizer(learning_rate=lr,beta1=beta1,beta2=beta2).minimize(errG, var_list=g_vars, global_step=global_step)
-   # optimize D
-   #D_train_op = tf.train.AdamOptimizer(learning_rate=lr,beta1=beta1,beta2=beta2).minimize(errD, var_list=d_vars)
-
    saver = tf.train.Saver(max_to_keep=1)
-   init = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
+   init  = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
    sess  = tf.Session()
    sess.run(init)
 
@@ -190,20 +188,41 @@ if __name__ == '__main__':
 
    step = sess.run(global_step)
 
-   train_distorted_paths    = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/distorted/*.JPEG'))
-   train_nondistorted_paths = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/nondistorted/*.JPEG'))
+   train_distorted_paths    = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/distorted/train/*.JPEG'))
+   train_nondistorted_paths = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/nondistorted/train/*.JPEG'))
+   
+   test_distorted_paths    = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/distorted/test/*.JPEG'))
+   test_nondistorted_paths = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/nondistorted/test/*.JPEG'))
 
    dlen  = len(train_distorted_paths)
    ndlen = len(train_nondistorted_paths)
 
-   # create labels: d: [0, 1], nd: [1, 0]
-   dlabels = [0, 1]
-   dlabels = np.asarray([dlabels]*dlen)
+   t_dlen  = len(test_distorted_paths)
+   t_ndlen = len(test_nondistorted_paths)
    
-   ndlabels = [1, 0]
-   ndlabels = np.asarray([ndlabels]*ndlen)
+   # create labels: d: [0, 1], nd: [1, 0]
+   dlabels_  = [0, 1]
+   dlabels   = np.asarray([dlabels_]*dlen)
+   ndlabels_ = [1, 0]
+   ndlabels  = np.asarray([ndlabels_]*ndlen)
+
+   # test labels (same thing, but could have different lengths)
+   t_dlabels  = np.asarray([dlabels_]*t_dlen)
+   t_ndlabels = np.asarray([ndlabels_]*t_ndlen)
+
+   # find the d_lambda
+   alpha = np.linspace(0,1, num=500000)
+   d_lambdas = []
+   x1 = 0
+   x2 = 0.0001
+   for a in alpha:
+      l = x1*(1-a) + x2*a
+      d_lambdas.append(l)
 
    while True:
+
+      if step > 499999: step_ = 0.0001
+      else: step_ = step
 
       # put in batch of distorted first, then non_distorted
       idx          = np.random.choice(np.arange(dlen), batch_size, replace=False)
@@ -218,7 +237,7 @@ if __name__ == '__main__':
          batch_images[i, ...] = img
          i += 1
       
-      sess.run(train_op, feed_dict={x:batch_images, y:batch_y})
+      sess.run(train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
       
       idx          = np.random.choice(np.arange(ndlen), batch_size, replace=False)
       batch_y      = ndlabels[idx]
@@ -233,40 +252,87 @@ if __name__ == '__main__':
          batch_images[i, ...] = img
          i += 1
      
-      sess.run(train_op, feed_dict={x:batch_images, y:batch_y})
+      sess.run(train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
       
       D_loss, G_loss, summary = sess.run([errD, errG, merged_summary_op],
-                                 feed_dict={x:batch_images, y:batch_y})
+                                 feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
 
       summary_writer.add_summary(summary, step)
 
       print 'step:',step,'D loss:',D_loss,'G_loss:',G_loss
       step += 1
 
-
+      '''
+         Save model and run tests. Save out some going from distorted -> nondistorted, and other way around
+      '''
       if step%500 == 0:
          print 'Saving model...'
          saver.save(sess, CHECKPOINT_DIR+'checkpoint-'+str(step))
          saver.export_meta_graph(CHECKPOINT_DIR+'checkpoint-'+str(step)+'.meta')
 
-         idx          = np.random.choice(np.arange(test_len), batch_size, replace=False)
-         batch_z      = np.random.normal(0.0, 1.0, size=[batch_size, 100]).astype(np.float32)
-         batch_y      = test_annots[idx]
-         batch_images = test_images[idx]
+         # distorted -> non distorted
+         idx          = np.random.choice(np.arange(t_dlen), batch_size, replace=False)
+         batch_y      = t_dlabels[idx]
+         batch_paths  = test_distorted_paths[idx]
+         batch_images1 = np.empty((batch_size, 256, 256, 3), dtype=np.float32)
+         i = 0
+         for img in batch_paths:
+            img = misc.imread(img)
+            img = misc.imresize(img, (256,256))
+            img = data_ops.normalize(img)
+            batch_images1[i, ...] = img
+            i += 1
+         dec1 = np.asarray(sess.run(decoded, feed_dict={x:batch_images1, y:batch_y, d_lambda:d_lambdas[step_]}))
 
-         gen_imgs = np.squeeze(np.asarray(sess.run([gen_images],
-                                 feed_dict={z:batch_z, y:batch_y, real_images:batch_images})))
+
+
+         # non distorted -> distorted
+         idx          = np.random.choice(np.arange(t_ndlen), batch_size, replace=False)
+         batch_y      = t_ndlabels[idx]
+         batch_paths  = test_nondistorted_paths[idx]
+         batch_images2 = np.empty((batch_size, 256, 256, 3), dtype=np.float32)
+         i = 0
+         for img in batch_paths:
+            img = misc.imread(img)
+            img = misc.imresize(img, (256,256))
+            img = data_ops.normalize(img)
+            batch_images2[i, ...] = img
+            i += 1
+         dec2 = np.asarray(sess.run(decoded, feed_dict={x:batch_images2, y:batch_y, d_lambda:d_lambdas[step_]}))
+
          num = 0
-         for img,atr in zip(gen_imgs, batch_y):
-            img = (img+1.)
-            img *= 127.5
-            img = np.clip(img, 0, 255).astype(np.uint8)
-            img = np.reshape(img, (64, 64, -1))
-            misc.imsave(IMAGES_DIR+'step_'+str(step)+'_num_'+str(num)+'.png', img)
-            with open(IMAGES_DIR+'attrs.txt', 'a') as f:
-               f.write('step_'+str(step)+'_num_'+str(num)+','+str(atr)+'\n')
+         for img1,img2 in zip(dec1, batch_images1):
+            blank = np.zeros((256*2, 256, 3))
+            img1 = (img1+1.)
+            img1 *= 127.5
+            img1 = np.clip(img1, 0, 255).astype(np.uint8)
+            
+            img2 = (img2+1.)
+            img2 *= 127.5
+            img2 = np.clip(img2, 0, 255).astype(np.uint8)
+
+            img = np.concatenate((img1, img2), axis=1)
+
+            misc.imsave(IMAGES_DIR+'step_'+str(step)+'AB_num_'+str(num)+'.png', img)
             num += 1
-            if num == 5: break
+            if num == 3: break
+         
+         num = 0
+         for img1,img2 in zip(dec2, batch_images2):
+            blank = np.zeros((256*2, 256, 3))
+            img1 = (img1+1.)
+            img1 *= 127.5
+            img1 = np.clip(img1, 0, 255).astype(np.uint8)
+            
+            img2 = (img2+1.)
+            img2 *= 127.5
+            img2 = np.clip(img2, 0, 255).astype(np.uint8)
+
+            img = np.concatenate((img2, img1), axis=1)
+
+            misc.imsave(IMAGES_DIR+'step_'+str(step)+'BA_num_'+str(num)+'.png', img)
+            num += 1
+            if num == 3: break
    
    saver.save(sess, CHECKPOINT_DIR+'checkpoint-'+str(step))
    saver.export_meta_graph(CHECKPOINT_DIR+'checkpoint-'+str(step)+'.meta')

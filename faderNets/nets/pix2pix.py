@@ -152,20 +152,18 @@ def decoder(enc, y, skip_connections, upsample):
 
 def netD(embedding, reuse=False):
 
-   #sc = tf.get_variable_scope()
-   #with tf.variable_scope(sc, reuse=reuse):
-
    conv1 = tcl.conv2d(embedding, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_conv1')
    conv1 = tcl.batch_norm(conv1)
    conv1 = lrelu(conv1)
+   conv1 = tcl.dropout(conv1, keep_prob=0.7)
 
    conv1 = tcl.flatten(conv1)
 
    fc1 = tcl.fully_connected(conv1, 512, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_fc1')
    fc1 = lrelu(fc1)
+   fc1 = tcl.dropout(fc1, keep_prob=0.7)
    
    fc2 = tcl.fully_connected(fc1, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_fc2')
-   #fc2 = sig(fc2)
 
    print 'conv1:',conv1
    print 'fc1:',fc1
