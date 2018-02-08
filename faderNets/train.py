@@ -158,7 +158,7 @@ if __name__ == '__main__':
    d_vars = [var for var in t_vars if 'd_' in var.name]
    g_vars = [var for var in t_vars if 'g_' in var.name]
 
-   train_op = tf.train.AdamOptimizer(learning_rate=0.0002).minimize(errG+errD)
+   train_op = tf.train.AdamOptimizer(learning_rate=0.0002).minimize(errG+errD, global_step=global_step)
 
    saver = tf.train.Saver(max_to_keep=1)
    init  = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
@@ -272,7 +272,7 @@ if __name__ == '__main__':
 
          # distorted -> non distorted
          idx          = np.random.choice(np.arange(t_dlen), batch_size, replace=False)
-         batch_y      = t_dlabels[idx]
+         batch_y      = t_ndlabels[idx]
          batch_paths  = test_distorted_paths[idx]
          batch_images1 = np.empty((batch_size, 256, 256, 3), dtype=np.float32)
          i = 0
@@ -288,7 +288,7 @@ if __name__ == '__main__':
 
          # non distorted -> distorted
          idx          = np.random.choice(np.arange(t_ndlen), batch_size, replace=False)
-         batch_y      = t_ndlabels[idx]
+         batch_y      = t_dlabels[idx]
          batch_paths  = test_nondistorted_paths[idx]
          batch_images2 = np.empty((batch_size, 256, 256, 3), dtype=np.float32)
          i = 0
