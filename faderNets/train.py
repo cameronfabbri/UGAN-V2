@@ -131,22 +131,26 @@ if __name__ == '__main__':
    x           = tf.placeholder(tf.float32, shape=(batch_size, 256, 256, 3), name='real_images')
    y           = tf.placeholder(tf.float32, shape=(batch_size, 2), name='y')
 
-   # lambda on the discriminator. Start at 0, and increase to 0.0001
+   # lambda on the discriminator. Start at 0, and increase to lambda_lat_dis
    d_lambda = tf.placeholder(tf.float32, name='d_lambda')
 
-   # the embedding of the image - this is a dictionary of all layers
+   # the embedding of the image - this is a dictionary of all layers in case we use skip connections
    enc = encoder(x)
    embedding = enc['embedding']
 
    decoded = decoder(enc, y, skip_connections, upsample)
-
+   
    # D's prediction on which class the embedding is
    logitsD = tf.nn.softmax(netD(embedding))
 
-   # loss on D - cross entropy with real class y - we want t maximize this
-   errD = tf.multiply(-tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logitsD)), d_lambda)
+   # discriminator loss - minimize cross entropy of predicting the label
+   errD = tf.multiply(tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logitsD)), d_lambda)
 
-   errG = lambda_ae*tf.reduce_mean(tf.nn.l2_loss(x-decoded))
+   # add the discriminator loss to the generator
+   errG = -errD
+
+   # generator loss
+   errG = errG + tf.reduce_mean(tf.losses.mean_squared_error(x,decoded,weights=lambda_ae))
 
    # tensorboard summaries
    tf.summary.scalar('d_loss', errD)
@@ -158,7 +162,9 @@ if __name__ == '__main__':
    d_vars = [var for var in t_vars if 'd_' in var.name]
    g_vars = [var for var in t_vars if 'g_' in var.name]
 
-   train_op = tf.train.AdamOptimizer(learning_rate=0.0002).minimize(errG+errD, global_step=global_step)
+   #train_op = tf.train.AdamOptimizer(learning_rate=0.0002).minimize(errG+errD, global_step=global_step)
+   G_train_op = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(errG, var_list=g_vars, global_step=global_step)
+   D_train_op = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(errD, var_list=d_vars)
 
    saver = tf.train.Saver(max_to_keep=1)
    init  = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
@@ -188,11 +194,11 @@ if __name__ == '__main__':
 
    step = sess.run(global_step)
 
-   train_distorted_paths    = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/distorted/train/*.JPEG'))
-   train_nondistorted_paths = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/nondistorted/train/*.JPEG'))
+   train_distorted_paths    = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/distorted/train/*.JPEG'))[:16]
+   train_nondistorted_paths = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/nondistorted/train/*.JPEG'))[:16]
    
-   test_distorted_paths    = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/distorted/test/*.JPEG'))
-   test_nondistorted_paths = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/nondistorted/test/*.JPEG'))
+   test_distorted_paths    = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/distorted/test/*.JPEG'))[:16]
+   test_nondistorted_paths = np.asarray(glob.glob('/mnt/data1/images/ugan_dataset/nondistorted/test/*.JPEG'))[:16]
 
    dlen  = len(train_distorted_paths)
    ndlen = len(train_nondistorted_paths)
@@ -214,14 +220,14 @@ if __name__ == '__main__':
    alpha = np.linspace(0,1, num=500000)
    d_lambdas = []
    x1 = 0
-   x2 = 0.0001
+   x2 = lambda_lat_dis
    for a in alpha:
       l = x1*(1-a) + x2*a
       d_lambdas.append(l)
 
    while True:
 
-      if step > 499999: step_ = 0.0001
+      if step > 499999: step_ = lambda_lat_dis
       else: step_ = step
 
       # put in batch of distorted first, then non_distorted
@@ -237,7 +243,9 @@ if __name__ == '__main__':
          batch_images[i, ...] = img
          i += 1
       
-      sess.run(train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      #sess.run(train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      sess.run(D_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      sess.run(G_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
       
       idx          = np.random.choice(np.arange(ndlen), batch_size, replace=False)
       batch_y      = ndlabels[idx]
@@ -252,7 +260,9 @@ if __name__ == '__main__':
          batch_images[i, ...] = img
          i += 1
      
-      sess.run(train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      #sess.run(train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      sess.run(D_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      sess.run(G_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
       
       D_loss, G_loss, summary = sess.run([errD, errG, merged_summary_op],
                                  feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
@@ -284,8 +294,6 @@ if __name__ == '__main__':
             i += 1
          dec1 = np.asarray(sess.run(decoded, feed_dict={x:batch_images1, y:batch_y, d_lambda:d_lambdas[step_]}))
 
-
-
          # non distorted -> distorted
          idx          = np.random.choice(np.arange(t_ndlen), batch_size, replace=False)
          batch_y      = t_dlabels[idx]
@@ -311,7 +319,7 @@ if __name__ == '__main__':
             img2 *= 127.5
             img2 = np.clip(img2, 0, 255).astype(np.uint8)
 
-            img = np.concatenate((img1, img2), axis=1)
+            img = np.concatenate((img2, img1), axis=1)
 
             misc.imsave(IMAGES_DIR+'step_'+str(step)+'AB_num_'+str(num)+'.png', img)
             num += 1

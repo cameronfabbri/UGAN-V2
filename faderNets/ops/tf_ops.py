@@ -105,8 +105,15 @@ def ln(x, s, b, epsilon = 1e-5):
    https://arxiv.org/abs/1607.08022
 '''
 def instance_norm(x, epsilon=1e-5):
+   #mean, var = tf.nn.moments(x, [1, 2], keep_dims=True)
+   #return tf.div(tf.subtract(x, mean), tf.sqrt(tf.add(var, epsilon)))
    mean, var = tf.nn.moments(x, [1, 2], keep_dims=True)
-   return tf.div(tf.subtract(x, mean), tf.sqrt(tf.add(var, epsilon)))
+   scale = tf.get_variable('scale',[x.get_shape()[-1]],
+      initializer=tf.truncated_normal_initializer(mean=1.0, stddev=0.02))
+   offset = tf.get_variable('offset',[x.get_shape()[-1]],initializer=tf.constant_initializer(0.0))
+   out = scale*tf.div(x-mean, tf.sqrt(var+epsilon)) + offset
+
+   return out
 
 '''
    2d transpose convolution, but resizing first then performing conv2d

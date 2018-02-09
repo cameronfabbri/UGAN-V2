@@ -79,8 +79,12 @@ def decoder(enc, y, skip_connections, upsample):
 
    if upsample == 'transpose_conv':
       dec_conv1 = tcl.convolution2d_transpose(enc_conv7, 512, 4, 1, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_conv1')
-   if upsample == 'pixel_shuffle': print 'not implemented yet'
-   if upsample == 'upconv': print 'not implemented yet'
+   if upsample == 'pixel_shuffle':
+      print 'not implemented yet'
+      exit()
+   if upsample == 'upconv':
+      print 'not implemented yet'
+      exit()
    dec_conv1 = relu(dec_conv1)
    if skip_connections: dec_conv1 = tf.concat([dec_conv1, enc_conv7], axis=3)
    dec_conv1 = conv_cond_concat(dec_conv1, y)
@@ -155,13 +159,12 @@ def netD(embedding, reuse=False):
    conv1 = tcl.conv2d(embedding, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_conv1')
    conv1 = tcl.batch_norm(conv1)
    conv1 = lrelu(conv1)
-   conv1 = tcl.dropout(conv1, keep_prob=0.7)
+   conv1 = tcl.dropout(conv1, keep_prob=0.7) # drop out 0.3
 
    conv1 = tcl.flatten(conv1)
 
    fc1 = tcl.fully_connected(conv1, 512, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_fc1')
    fc1 = lrelu(fc1)
-   fc1 = tcl.dropout(fc1, keep_prob=0.7)
    
    fc2 = tcl.fully_connected(fc1, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='d_fc2')
 
