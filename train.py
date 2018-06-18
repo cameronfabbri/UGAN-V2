@@ -40,6 +40,7 @@ if __name__ == '__main__':
    parser.add_argument('--AUGMENT',       required=False,default=0,type=int,help='Augment data or not')
    parser.add_argument('--EPOCHS',        required=False,default=100,type=int,help='Number of epochs for GAN')
    parser.add_argument('--DATA',          required=False,default='underwater_imagenet',type=str,help='Dataset to use')
+   parser.add_argument('--LAB',           required=False,default=0,type=int,help='LAB colorspace option')
    a = parser.parse_args()
 
    LEARNING_RATE = float(a.LEARNING_RATE)
@@ -51,13 +52,15 @@ if __name__ == '__main__':
    AUGMENT       = a.AUGMENT
    EPOCHS        = a.EPOCHS
    DATA          = a.DATA
+   LAB           = bool(a.LAB)
    
    EXPERIMENT_DIR  = 'checkpoints/LOSS_METHOD_'+LOSS_METHOD\
                      +'/NETWORK_'+NETWORK\
                      +'/L1_WEIGHT_'+str(L1_WEIGHT)\
                      +'/IG_WEIGHT_'+str(IG_WEIGHT)\
                      +'/AUGMENT_'+str(AUGMENT)\
-                     +'/DATA_'+DATA+'/'\
+                     +'/DATA_'+DATA\
+                     +'/LAB_'+str(LAB)+'/'\
 
    IMAGES_DIR      = EXPERIMENT_DIR+'images/'
 
@@ -68,8 +71,6 @@ if __name__ == '__main__':
    try: os.makedirs(TEST_IMAGES_DIR)
    except: pass
 
-   # TODO add new things to pickle file - INCLUDING BATCH SIZE AND LEARNING RATE
-   # write all this info to a pickle file in the experiments directory
    exp_info = dict()
    exp_info['LEARNING_RATE'] = LEARNING_RATE
    exp_info['LOSS_METHOD']   = LOSS_METHOD
@@ -80,6 +81,7 @@ if __name__ == '__main__':
    exp_info['AUGMENT']       = AUGMENT
    exp_info['EPOCHS']        = EPOCHS
    exp_info['DATA']          = DATA
+   exp_info['LAB']           = LAB
    exp_pkl = open(EXPERIMENT_DIR+'info.pkl', 'wb')
    data = pickle.dumps(exp_info)
    exp_pkl.write(data)
@@ -95,6 +97,7 @@ if __name__ == '__main__':
    print 'AUGMENT:       ',AUGMENT
    print 'EPOCHS:        ',EPOCHS
    print 'DATA:          ',DATA
+   print 'LAB:           ',LAB
    print
 
    if NETWORK == 'pix2pix': from pix2pix import *
@@ -105,9 +108,11 @@ if __name__ == '__main__':
 
    # underwater image
    image_u = tf.placeholder(tf.float32, shape=(BATCH_SIZE, 256, 256, 3), name='image_u')
+   if LAB: image_u = rgb_to_lab(image_u)
 
    # correct image
    image_r = tf.placeholder(tf.float32, shape=(BATCH_SIZE, 256, 256, 3), name='image_r')
+   if LAB: image_r = rgb_to_lab(image_r)
 
    # generated corrected colors
    layers    = netG_encoder(image_u)
@@ -176,11 +181,7 @@ if __name__ == '__main__':
    sess = tf.Session()
    sess.run(init)
 
-   # write out logs for tensorboard to the checkpointSdir
    summary_writer = tf.summary.FileWriter(EXPERIMENT_DIR+'/logs/', graph=tf.get_default_graph())
-
-   tf.add_to_collection('vars', G_train_op)
-   tf.add_to_collection('vars', D_train_op)
 
    ckpt = tf.train.get_checkpoint_state(EXPERIMENT_DIR)
    if ckpt and ckpt.model_checkpoint_path:
@@ -201,11 +202,10 @@ if __name__ == '__main__':
    # normal photos (ground truth)
    trainB_paths = np.asarray(glob.glob('datasets/'+DATA+'/trainB/*.jpg'))
    # testing paths
-   #test_paths = np.asarray(glob.glob('datasets/'+DATA+'/test/*.jpg'))
-   test_paths = np.asarray(glob.glob('datasets/'+DATA+'/trainA/*.jpg'))
+   test_paths = np.asarray(glob.glob('datasets/'+DATA+'/test/*.jpg'))
+   #test_paths = np.asarray(glob.glob('datasets/'+DATA+'/trainA/*.jpg'))
 
-   print len(trainB_paths),'training images'
-
+   print len(trainB_paths),'training pairs'
    num_train = len(trainB_paths)
    num_test  = len(test_paths)
 
@@ -214,8 +214,6 @@ if __name__ == '__main__':
 
    epoch_num = step/(num_train/BATCH_SIZE)
 
-   # kernel for gaussian blurring
-   kernel = np.ones((5,5),np.float32)/25
 
    while epoch_num < EPOCHS:
       s = time.time()
@@ -235,28 +233,6 @@ if __name__ == '__main__':
 
          # Data augmentation here - each has 50% chance
          if AUGMENT:
-            r = random.random()
-            # flip image left right
-            if r < 0.5:
-               a_img = np.fliplr(a_img)
-               b_img = np.fliplr(b_img)
-            
-            r = random.random()
-            # flip image up down
-            if r < 0.5:
-               a_img = np.flipud(a_img)
-               b_img = np.flipud(b_img)
-            
-            r = random.random()
-            # send in the clean image for both
-            if r < 0.5:
-               a_img = b_img
-
-            r = random.random()
-            # perform some gaussian blur on distorted image
-            if r < 0.5:
-               #print 'blur'
-               a_img = cv2.filter2D(a_img,-1,kernel)
 
          #misc.imsave('a_img.png', a_img)
          #misc.imsave('b_img.png', b_img)

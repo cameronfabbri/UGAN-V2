@@ -2,8 +2,6 @@
 
 Operations used for data management
 
-MASSIVE help from https://github.com/affinelayer/pix2pix-tensorflow/blob/master/pix2pix.py
-
 '''
 
 from __future__ import division
@@ -21,8 +19,6 @@ import glob
 import os
 import fnmatch
 import cPickle as pickle
-
-Data = collections.namedtuple('trainData', 'ugray, uab, places2_L, places2_ab')
 
 # [-1,1] -> [0, 255]
 def deprocess(x):
@@ -47,7 +43,7 @@ def deprocess_lab(L_chan, a_chan, b_chan):
         return tf.stack([(L_chan + 1) / 2 * 100, a_chan * 110, b_chan * 110], axis=3)
         #return tf.stack([(L_chan + 1) / 2 * 100, a_chan * 110, b_chan * 110], axis=2)
 
-
+'''
 def augment(image, brightness):
     # (a, b) color channels, combine with L channel and convert to rgb
     a_chan, b_chan = tf.unstack(image, axis=3)
@@ -55,6 +51,39 @@ def augment(image, brightness):
     lab = deprocess_lab(L_chan, a_chan, b_chan)
     rgb = lab_to_rgb(lab)
     return rgb
+'''
+
+'''
+   Augment images - a is distorted
+'''
+def augment(a_img, b_img):
+
+   # kernel for gaussian blurring
+   kernel = np.ones((5,5),np.float32)/25
+   
+   r = random.random()
+   # flip image left right
+   if r < 0.5:
+      a_img = np.fliplr(a_img)
+      b_img = np.fliplr(b_img)
+   
+   r = random.random()
+   # flip image up down
+   if r < 0.5:
+      a_img = np.flipud(a_img)
+      b_img = np.flipud(b_img)
+   
+   r = random.random()
+   # send in the clean image for both
+   if r < 0.5:
+      a_img = b_img
+
+   r = random.random()
+   # perform some gaussian blur on distorted image
+   if r < 0.5:
+      a_img = cv2.filter2D(a_img,-1,kernel)
+
+
 
 
 
@@ -154,17 +183,6 @@ def lab_to_rgb(lab):
         return tf.reshape(srgb_pixels, tf.shape(lab))
 
 
-def getFeedDict(utrain_paths,places2_paths,BATCH_SIZE):
-
-   utrain_batch    = random.sample(utrain_paths, BATCH_SIZE)
-   places2train_batch = random.sample(places2_paths, BATCH_SIZE)
-
-   img = tf.image.decode_image(utrain_batch[0])
-   print img
-
-
-   exit()
-
 def getPaths(data_dir,ext='jpg'):
    pattern   = '*.'+ext
    image_paths = []
@@ -179,60 +197,45 @@ def getPaths(data_dir,ext='jpg'):
 # TODO add in files to exclude (gray ones)
 def loadData(batch_size, train=True):
 
-   # pickle files containing images of underwater
-   pkl_utrain_file = 'files/underwater_train.pkl'
-   pkl_utest_file  = 'files/underwater_test.pkl'
+   print 'Reading data...'
+   utrain_dir  = '/mnt/data2/images/underwater/youtube/'
+   #places2_dir  = '/mnt/data2/images/underwater/youtube/'
+   #places2_dir    = '/mnt/data2/images/places2/test2014/'
+   places2_dir    = '/mnt/data2/images/places2_standard/train_256/'
 
-   # microsoft places2 images
-   pkl_places2_file = 'files/places2_train.pkl'
+   # get all paths for underwater images
+   u_paths    = getPaths(utrain_dir)
+   # get all paths for places2 images
+   places2_paths = getPaths(places2_dir)
 
-   # load saved pickle files if already have them
-   if os.path.isfile(pkl_utrain_file) and os.path.isfile(pkl_utest_file) and os.path.isfile(pkl_places2_file):
-      print 'Found pickle files'
-      utest_paths      = pickle.load(open(pkl_utest_file, 'rb'))
-      if train:
-         utrain_paths     = pickle.load(open(pkl_utrain_file, 'rb'))
-         places2_paths = pickle.load(open(pkl_places2_file, 'rb'))
-   else:
-      print 'Reading data...'
-      utrain_dir  = '/mnt/data2/images/underwater/youtube/'
-      #places2_dir  = '/mnt/data2/images/underwater/youtube/'
-      #places2_dir    = '/mnt/data2/images/places2/test2014/'
-      places2_dir    = '/mnt/data2/images/places2_standard/train_256/'
+   # shuffle all the underwater paths before splitting into test/train
+   random.shuffle(u_paths)
 
-      # get all paths for underwater images
-      u_paths    = getPaths(utrain_dir)
-      # get all paths for places2 images
-      places2_paths = getPaths(places2_dir)
+   # shuffle places2 images because why not
+   random.shuffle(places2_paths)
 
-      # shuffle all the underwater paths before splitting into test/train
-      random.shuffle(u_paths)
+   # take 90% for train, 10% for test
+   train_num = int(0.95*len(u_paths))
+   utrain_paths = u_paths[:train_num]
+   utest_paths  = u_paths[train_num:]
 
-      # shuffle places2 images because why not
-      random.shuffle(places2_paths)
+   # write train underwater data
+   pf   = open(pkl_utrain_file, 'wb')
+   data = pickle.dumps(utrain_paths)
+   pf.write(data)
+   pf.close()
 
-      # take 90% for train, 10% for test
-      train_num = int(0.95*len(u_paths))
-      utrain_paths = u_paths[:train_num]
-      utest_paths  = u_paths[train_num:]
+   # write test underwater data
+   pf   = open(pkl_utest_file, 'wb')
+   data = pickle.dumps(utest_paths)
+   pf.write(data)
+   pf.close()
 
-      # write train underwater data
-      pf   = open(pkl_utrain_file, 'wb')
-      data = pickle.dumps(utrain_paths)
-      pf.write(data)
-      pf.close()
-
-      # write test underwater data
-      pf   = open(pkl_utest_file, 'wb')
-      data = pickle.dumps(utest_paths)
-      pf.write(data)
-      pf.close()
-
-      # write test places2 data
-      pf   = open(pkl_places2_file, 'wb')
-      data = pickle.dumps(places2_paths)
-      pf.write(data)
-      pf.close()
+   # write test places2 data
+   pf   = open(pkl_places2_file, 'wb')
+   data = pickle.dumps(places2_paths)
+   pf.write(data)
+   pf.close()
 
    if train:
       print
