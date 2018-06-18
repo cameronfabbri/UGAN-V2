@@ -131,7 +131,7 @@ if __name__ == '__main__':
    x           = tf.placeholder(tf.float32, shape=(batch_size, 256, 256, 3), name='real_images')
    y           = tf.placeholder(tf.float32, shape=(batch_size, 2), name='y')
 
-   # lambda on the discriminator. Start at 0, and increase to lambda_lat_dis
+   # lambda on discriminator
    d_lambda = tf.placeholder(tf.float32, name='d_lambda')
 
    # the embedding of the image - this is a dictionary of all layers in case we use skip connections
@@ -144,13 +144,14 @@ if __name__ == '__main__':
    logitsD = tf.nn.softmax(netD(embedding))
 
    # discriminator loss - minimize cross entropy of predicting the label
-   errD = tf.multiply(tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logitsD)), d_lambda)
+   errD = -tf.multiply(tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logitsD)), d_lambda)
 
    # add the discriminator loss to the generator
-   errG = -errD
+   #errG = -errD
 
    # generator loss
-   errG = errG + tf.reduce_mean(tf.losses.mean_squared_error(x,decoded,weights=lambda_ae))
+   #errG = tf.reduce_mean(tf.losses.mean_squared_error(x,decoded,weights=lambda_ae))
+   errG = tf.reduce_mean(tf.nn.l2_loss(decoded-x))
 
    # tensorboard summaries
    tf.summary.scalar('d_loss', errD)
@@ -158,13 +159,13 @@ if __name__ == '__main__':
    merged_summary_op = tf.summary.merge_all()
 
    # get all trainable variables, and split by network G and network D
-   t_vars = tf.trainable_variables()
-   d_vars = [var for var in t_vars if 'd_' in var.name]
-   g_vars = [var for var in t_vars if 'g_' in var.name]
+   #t_vars = tf.trainable_variables()
+   #d_vars = [var for var in t_vars if 'd_' in var.name]
+   #g_vars = [var for var in t_vars if 'g_' in var.name]
 
-   #train_op = tf.train.AdamOptimizer(learning_rate=0.0002).minimize(errG+errD, global_step=global_step)
-   G_train_op = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(errG, var_list=g_vars, global_step=global_step)
-   D_train_op = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(errD, var_list=d_vars)
+   train_op = tf.train.AdamOptimizer(learning_rate=0.0002).minimize(errG+errD, global_step=global_step)
+   #G_train_op = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(errG, var_list=g_vars, global_step=global_step)
+   #D_train_op = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(errD, var_list=d_vars)
 
    saver = tf.train.Saver(max_to_keep=1)
    init  = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
@@ -217,18 +218,22 @@ if __name__ == '__main__':
    t_ndlabels = np.asarray([ndlabels_]*t_ndlen)
 
    # find the d_lambda
-   alpha = np.linspace(0,1, num=500000)
+   #alpha = np.linspace(0,1, num=500000)
+   #d_lambdas = []
+   #x1 = 0
+   #x2 = lambda_lat_dis
+   #for a in alpha:
+   #   l = x1*(1-a) + x2*a
+   #   d_lambdas.append(l)
+
    d_lambdas = []
-   x1 = 0
-   x2 = lambda_lat_dis
-   for a in alpha:
-      l = x1*(1-a) + x2*a
-      d_lambdas.append(l)
+   d_lambdas.append(1)
+   step_ = 0
 
    while True:
 
-      if step > 499999: step_ = lambda_lat_dis
-      else: step_ = step
+      #if step > 499999: step_ = lambda_lat_dis
+      #else: step_ = step
 
       # put in batch of distorted first, then non_distorted
       idx          = np.random.choice(np.arange(dlen), batch_size, replace=False)
@@ -243,9 +248,9 @@ if __name__ == '__main__':
          batch_images[i, ...] = img
          i += 1
       
-      #sess.run(train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
-      sess.run(D_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
-      sess.run(G_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      sess.run(train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      #sess.run(D_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      #sess.run(G_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
       
       idx          = np.random.choice(np.arange(ndlen), batch_size, replace=False)
       batch_y      = ndlabels[idx]
@@ -260,9 +265,9 @@ if __name__ == '__main__':
          batch_images[i, ...] = img
          i += 1
      
-      #sess.run(train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
-      sess.run(D_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
-      sess.run(G_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      sess.run(train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      #sess.run(D_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
+      #sess.run(G_train_op, feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
       
       D_loss, G_loss, summary = sess.run([errD, errG, merged_summary_op],
                                  feed_dict={x:batch_images, y:batch_y, d_lambda:d_lambdas[step_]})
@@ -281,9 +286,9 @@ if __name__ == '__main__':
          saver.export_meta_graph(CHECKPOINT_DIR+'checkpoint-'+str(step)+'.meta')
 
          # distorted -> non distorted
-         idx          = np.random.choice(np.arange(t_dlen), batch_size, replace=False)
-         batch_y      = t_ndlabels[idx]
-         batch_paths  = test_distorted_paths[idx]
+         idx           = np.random.choice(np.arange(t_dlen), batch_size, replace=False)
+         batch_y       = t_ndlabels[idx]
+         batch_paths   = test_distorted_paths[idx]
          batch_images1 = np.empty((batch_size, 256, 256, 3), dtype=np.float32)
          i = 0
          for img in batch_paths:
