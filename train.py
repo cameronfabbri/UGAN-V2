@@ -1,8 +1,11 @@
 '''
 
    Main training file
+
    The goal is to correct the colors in underwater images.
-   This is pretty much CycleWGAN with an auxiliary discriminator to predict class
+   CycleGAN was used to create images that appear to be underwater.
+   Those will be sent into the generator, which will attempt to correct the
+   colors.
 
 '''
 
@@ -11,19 +14,20 @@ import tensorflow as tf
 from scipy import misc
 from tqdm import tqdm
 import numpy as np
-from nets import *
 import argparse
 import ntpath
-import sys
-import os
+import random
 import glob
 import time
+import sys
+import cv2
+import os
 
+# my imports
 sys.path.insert(0, 'ops/')
 sys.path.insert(0, 'nets/')
-
 from tf_ops import *
-#import data_ops
+import data_ops
 
 if __name__ == '__main__':
    parser = argparse.ArgumentParser()
@@ -31,8 +35,9 @@ if __name__ == '__main__':
    parser.add_argument('--LOSS_METHOD',   required=False,default='wgan',help='Loss function for GAN')
    parser.add_argument('--BATCH_SIZE',    required=False,default=32,type=int,help='Batch size')
    parser.add_argument('--L1_WEIGHT',     required=False,default=100.,type=float,help='Weight for L1 loss')
-   parser.add_argument('--IG_WEIGHT',     required=False,default=1.0,type=float,help='Weight for image gradient loss')
-   parser.add_argument('--NETWORK',       required=False,default='resnet',type=str,help='Network to use')
+   parser.add_argument('--IG_WEIGHT',     required=False,default=1.,type=float,help='Weight for image gradient loss')
+   parser.add_argument('--NETWORK',       required=False,default='pix2pix',type=str,help='Network to use')
+   parser.add_argument('--AUGMENT',       required=False,default=0,type=int,help='Augment data or not')
    parser.add_argument('--EPOCHS',        required=False,default=100,type=int,help='Number of epochs for GAN')
    parser.add_argument('--DATA',          required=False,default='underwater_imagenet',type=str,help='Dataset to use')
    a = parser.parse_args()
@@ -43,6 +48,7 @@ if __name__ == '__main__':
    L1_WEIGHT     = float(a.L1_WEIGHT)
    IG_WEIGHT     = float(a.IG_WEIGHT)
    NETWORK       = a.NETWORK
+   AUGMENT       = a.AUGMENT
    EPOCHS        = a.EPOCHS
    DATA          = a.DATA
    
@@ -50,10 +56,10 @@ if __name__ == '__main__':
                      +'/NETWORK_'+NETWORK\
                      +'/L1_WEIGHT_'+str(L1_WEIGHT)\
                      +'/IG_WEIGHT_'+str(IG_WEIGHT)\
+                     +'/AUGMENT_'+str(AUGMENT)\
                      +'/DATA_'+DATA+'/'\
 
    IMAGES_DIR      = EXPERIMENT_DIR+'images/'
-   TEST_IMAGES_DIR = EXPERIMENT_DIR+'test_images/'
 
    print
    print 'Creating',EXPERIMENT_DIR
@@ -71,6 +77,7 @@ if __name__ == '__main__':
    exp_info['L1_WEIGHT']     = L1_WEIGHT
    exp_info['IG_WEIGHT']     = IG_WEIGHT
    exp_info['NETWORK']       = NETWORK
+   exp_info['AUGMENT']       = AUGMENT
    exp_info['EPOCHS']        = EPOCHS
    exp_info['DATA']          = DATA
    exp_pkl = open(EXPERIMENT_DIR+'info.pkl', 'wb')
@@ -85,9 +92,13 @@ if __name__ == '__main__':
    print 'L1_WEIGHT:     ',L1_WEIGHT
    print 'IG_WEIGHT:     ',IG_WEIGHT
    print 'NETWORK:       ',NETWORK
+   print 'AUGMENT:       ',AUGMENT
    print 'EPOCHS:        ',EPOCHS
    print 'DATA:          ',DATA
    print
+
+   if NETWORK == 'pix2pix': from pix2pix import *
+   if NETWORK == 'resnet': from resnet import *
 
    # global step that is saved with a model to keep track of how many steps/epochs
    global_step = tf.Variable(0, name='global_step', trainable=False)
@@ -99,12 +110,11 @@ if __name__ == '__main__':
    image_r = tf.placeholder(tf.float32, shape=(BATCH_SIZE, 256, 256, 3), name='image_r')
 
    # generated corrected colors
-   gen_image = netG(image_u, LOSS_METHOD)
+   layers    = netG_encoder(image_u)
+   gen_image = netG_decoder(layers)
 
    # send 'above' water images to D
    D_real = netD(image_r, LOSS_METHOD)
-   print 'here'
-   exit()
 
    # send corrected underwater images to D
    D_fake = netD(gen_image, LOSS_METHOD, reuse=True)
@@ -125,7 +135,7 @@ if __name__ == '__main__':
    if LOSS_METHOD == 'wgan':
       # cost functions
       errD = tf.reduce_mean(D_real) - tf.reduce_mean(D_fake)
-      errG = tf.reduce_mean(D_fake)
+      errG = -tf.reduce_mean(D_fake)
 
       # gradient penalty
       epsilon = tf.random_uniform([], 0.0, 1.0)
@@ -191,7 +201,8 @@ if __name__ == '__main__':
    # normal photos (ground truth)
    trainB_paths = np.asarray(glob.glob('datasets/'+DATA+'/trainB/*.jpg'))
    # testing paths
-   test_paths = np.asarray(glob.glob('datasets/'+DATA+'/test/*.jpg'))
+   #test_paths = np.asarray(glob.glob('datasets/'+DATA+'/test/*.jpg'))
+   test_paths = np.asarray(glob.glob('datasets/'+DATA+'/trainA/*.jpg'))
 
    print len(trainB_paths),'training images'
 
@@ -199,9 +210,12 @@ if __name__ == '__main__':
    num_test  = len(test_paths)
 
    n_critic = 1
-   if LOSS_METHOD == 'wgan': n_critic = 2
+   if LOSS_METHOD == 'wgan': n_critic = 5
 
    epoch_num = step/(num_train/BATCH_SIZE)
+
+   # kernel for gaussian blurring
+   kernel = np.ones((5,5),np.float32)/25
 
    while epoch_num < EPOCHS:
       s = time.time()
@@ -218,6 +232,35 @@ if __name__ == '__main__':
       for a,b in zip(batchA_paths, batchB_paths):
          a_img = data_ops.preprocess(misc.imread(a).astype('float32'))
          b_img = data_ops.preprocess(misc.imread(b).astype('float32'))
+
+         # Data augmentation here - each has 50% chance
+         if AUGMENT:
+            r = random.random()
+            # flip image left right
+            if r < 0.5:
+               a_img = np.fliplr(a_img)
+               b_img = np.fliplr(b_img)
+            
+            r = random.random()
+            # flip image up down
+            if r < 0.5:
+               a_img = np.flipud(a_img)
+               b_img = np.flipud(b_img)
+            
+            r = random.random()
+            # send in the clean image for both
+            if r < 0.5:
+               a_img = b_img
+
+            r = random.random()
+            # perform some gaussian blur on distorted image
+            if r < 0.5:
+               #print 'blur'
+               a_img = cv2.filter2D(a_img,-1,kernel)
+
+         #misc.imsave('a_img.png', a_img)
+         #misc.imsave('b_img.png', b_img)
+         #exit()
          batchA_images[i, ...] = a_img
          batchB_images[i, ...] = b_img
          i += 1
@@ -253,7 +296,7 @@ if __name__ == '__main__':
             batch_images[i, ...] = a_img
             i += 1
 
-         gen_images = np.asarray(sess.run(gen_image, feed_dict={image_u:batch_images}))#, image_r:batchB_images}))
+         gen_images = np.asarray(sess.run(gen_image, feed_dict={image_u:batch_images}))
 
          c = 0
          for gen, real in zip(gen_images, batch_images):

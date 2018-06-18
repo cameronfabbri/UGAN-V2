@@ -24,17 +24,6 @@ import cPickle as pickle
 
 Data = collections.namedtuple('trainData', 'ugray, uab, places2_L, places2_ab')
 
-'''
-   Image normalizing functions
-'''
-def normalize(image):
-   return (image/127.5)-1.0
-
-def unnormalize(image):
-   img = (img+1.)
-   img *= 127.5
-   return img
-
 # [-1,1] -> [0, 255]
 def deprocess(x):
    return (x+1.0)*127.5

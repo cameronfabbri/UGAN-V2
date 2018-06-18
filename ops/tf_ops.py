@@ -9,15 +9,6 @@ import numpy as np
 import math
 
 '''
-   Concatenate conditioning vector on feature map axis.
-   Useful for conditional gans and stuff
-'''
-def conv_cond_concat(x, y):
-   x_shapes = x.get_shape()
-   y_shapes = y.get_shape()
-   return tf.concat([x, y*tf.ones([x_shapes[0], x_shapes[1], x_shapes[2], y_shapes[3]])], 3)
-
-'''
 
   Image Gradient Difference Loss (GDL) as seen in https://arxiv.org/abs/1511.05440
 
@@ -105,15 +96,8 @@ def ln(x, s, b, epsilon = 1e-5):
    https://arxiv.org/abs/1607.08022
 '''
 def instance_norm(x, epsilon=1e-5):
-   #mean, var = tf.nn.moments(x, [1, 2], keep_dims=True)
-   #return tf.div(tf.subtract(x, mean), tf.sqrt(tf.add(var, epsilon)))
    mean, var = tf.nn.moments(x, [1, 2], keep_dims=True)
-   scale = tf.get_variable('scale',[x.get_shape()[-1]],
-      initializer=tf.truncated_normal_initializer(mean=1.0, stddev=0.02))
-   offset = tf.get_variable('offset',[x.get_shape()[-1]],initializer=tf.constant_initializer(0.0))
-   out = scale*tf.div(x-mean, tf.sqrt(var+epsilon)) + offset
-
-   return out
+   return tf.div(tf.subtract(x, mean), tf.sqrt(tf.add(var, epsilon)))
 
 '''
    2d transpose convolution, but resizing first then performing conv2d
@@ -137,6 +121,40 @@ def upconv2d(x, filters, name=None, new_height=None, new_width=None, kernel_size
 
    # conv with stride 1
    return tf.layers.conv2d(x_resize, filters, kernel_size, strides=1, name=name)
+
+'''
+   3d transpose convolution, but resizing first then performing conv2d with stride 1
+
+   The 5D tensor needs to be converted to the size resize_images needs, which is 4D
+   help from: https://stackoverflow.com/questions/43851999/resize-3d-image-with-5d-tensor-in-tensorflow
+
+   Assumes input tensor is (BATCH, HEIGHT, WIDTH, DEPTH, CHANNELS)
+   where DEPTH can be time or something. For example, 4 stacked
+   images that have 3 color channels, height and width of 256 with batch size of 1 would
+   be (1, 256, 256, 4, 3)
+   
+'''
+# TODO testing, not sure if this works correctly yet
+def upconv3d(x, filters, name, kernel_size=[1,1,1]):
+   
+   # get original depth, height, and width of the volume
+   shapes = x.get_shape().as_list()
+   depth  = shapes[1]
+   height = shapes[2]
+   width  = shapes[3]
+
+   x = tf.reshape(x, [shapes[0]*shapes[1], shapes[2], shapes[3], shapes[4]])
+
+   new_size = tf.constant([height*2, width*2])
+   resized = tf.image.resize_images(x, new_size)
+
+   # now put back to 5D
+   x = tf.reshape(resized, [shapes[0], shapes[1], height*2, width*2, shapes[4]])
+
+   # now conv with stride 1
+   out = tf.layers.conv3d(x, filters, kernel_size, strides=(1,1,1), name=name)
+   return out
+
 
 
 '''
