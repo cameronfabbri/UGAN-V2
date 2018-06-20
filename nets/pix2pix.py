@@ -5,111 +5,52 @@ import sys
 sys.path.insert(0, 'ops/')
 from tf_ops import *
 
-def netG_encoder(x):
-      
-   enc_conv1 = tcl.conv2d(x, 64, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_enc_conv1')
-   enc_conv1 = tcl.batch_norm(enc_conv1)
-   enc_conv1 = lrelu(enc_conv1)
+def netG_encoder(enc, NUM_LAYERS):
+
+   print 'input:',enc
+
+   layers = []
+
+   # feature maps
+   fm = 64
+
+   for l in range(NUM_LAYERS/2):
+      enc = tcl.conv2d(enc, fm, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_enc_'+str(l))
+      enc = tcl.batch_norm(enc)
+      enc = lrelu(enc)
+      fm = fm*2
+      if fm > 512: fm = 512
+      layers.append(enc)
+
+   for l in layers:
+      print 'enc:',l
    
-   enc_conv2 = tcl.conv2d(enc_conv1, 128, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_enc_conv2')
-   enc_conv2 = tcl.batch_norm(enc_conv2)
-   enc_conv2 = lrelu(enc_conv2)
-   
-   enc_conv3 = tcl.conv2d(enc_conv2, 256, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_enc_conv3')
-   enc_conv3 = tcl.batch_norm(enc_conv3)
-   enc_conv3 = lrelu(enc_conv3)
-
-   enc_conv4 = tcl.conv2d(enc_conv3, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_enc_conv4')
-   enc_conv4 = tcl.batch_norm(enc_conv4)
-   enc_conv4 = lrelu(enc_conv4)
-   
-   enc_conv5 = tcl.conv2d(enc_conv4, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_enc_conv5')
-   enc_conv5 = tcl.batch_norm(enc_conv5)
-   enc_conv5 = lrelu(enc_conv5)
-
-   enc_conv6 = tcl.conv2d(enc_conv5, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_enc_conv6')
-   enc_conv6 = tcl.batch_norm(enc_conv6)
-   enc_conv6 = lrelu(enc_conv6)
-   
-   enc_conv7 = tcl.conv2d(enc_conv6, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_enc_conv7')
-   enc_conv7 = tcl.batch_norm(enc_conv7)
-   enc_conv7 = lrelu(enc_conv7)
-
-   enc_conv8 = tcl.conv2d(enc_conv7, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_enc_conv8')
-   enc_conv8 = tcl.batch_norm(enc_conv8)
-   enc_conv8 = lrelu(enc_conv8)
-
-   print 'x:        ',x
-   print 'enc_conv1:',enc_conv1
-   print 'enc_conv2:',enc_conv2
-   print 'enc_conv3:',enc_conv3
-   print 'enc_conv4:',enc_conv4
-   print 'enc_conv5:',enc_conv5
-   print 'enc_conv6:',enc_conv6
-   print 'enc_conv7:',enc_conv7
-   print 'enc_conv8:',enc_conv8
-   print
-
-   layers = [enc_conv1, enc_conv2, enc_conv3, enc_conv4, enc_conv5, enc_conv6, enc_conv7, enc_conv8]
-
    return layers
 
-def netG_decoder(layers, reuse=False):
-   
-   sc = tf.get_variable_scope()
-   with tf.variable_scope(sc, reuse=reuse):
+def netG_decoder(layers, NUM_LAYERS):
+   print
+   # get feature maps
+   fm = layers[-1].get_shape().as_list()[-1]
 
-      enc_conv1 = layers[0]
-      enc_conv2 = layers[1]
-      enc_conv3 = layers[2]
-      enc_conv4 = layers[3]
-      enc_conv5 = layers[4]
-      enc_conv6 = layers[5]
-      enc_conv7 = layers[6]
-      enc_conv8 = layers[7]
+   dec = layers[-1]
 
-      # decoder, no batch norm
-      dec_conv1 = tcl.convolution2d_transpose(enc_conv8, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_conv1')
-      dec_conv1 = relu(dec_conv1)
-      dec_conv1 = tf.concat([dec_conv1, enc_conv7], axis=3)
-      print 'dec_conv1:',dec_conv1
-
-      dec_conv2 = tcl.convolution2d_transpose(dec_conv1, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_conv2')
-      dec_conv2 = relu(dec_conv2)
-      dec_conv2 = tf.concat([dec_conv2, enc_conv6], axis=3)
-      print 'dec_conv2:',dec_conv2
-      
-      dec_conv3 = tcl.convolution2d_transpose(dec_conv2, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_conv3')
-      dec_conv3 = relu(dec_conv3)
-      dec_conv3 = tf.concat([dec_conv3, enc_conv5], axis=3)
-      print 'dec_conv3:',dec_conv3
-
-      dec_conv4 = tcl.convolution2d_transpose(dec_conv3, 512, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_conv4')
-      dec_conv4 = relu(dec_conv4)
-      dec_conv4 = tf.concat([dec_conv4, enc_conv4], axis=3)
-      print 'dec_conv4:',dec_conv4
-      
-      dec_conv5 = tcl.convolution2d_transpose(dec_conv4, 256, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_conv5')
-      dec_conv5 = relu(dec_conv5)
-      dec_conv5 = tf.concat([dec_conv5, enc_conv3], axis=3)
-      print 'dec_conv5:',dec_conv5
-
-      dec_conv6 = tcl.convolution2d_transpose(dec_conv5, 128, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_conv6')
-      dec_conv6 = relu(dec_conv6)
-      dec_conv6 = tf.concat([dec_conv6, enc_conv2], axis=3)
-      print 'dec_conv6:',dec_conv6
-      
-      dec_conv7 = tcl.convolution2d_transpose(dec_conv6, 64, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_conv7')
-      dec_conv7 = relu(dec_conv7)
-      dec_conv7 = tf.concat([dec_conv7, enc_conv1], axis=3)
-      print 'dec_conv7:',dec_conv7
-      
-      dec_conv8 = tcl.convolution2d_transpose(dec_conv7, 3, 4, 2, activation_fn=tf.identity, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_conv8')
-      dec_conv8 = tanh(dec_conv8)
-      print 'dec_conv8', dec_conv8
-      
-      return dec_conv8
-
+   '''
+      This overly confusing for loop is able to account for dynamic amounts of layers
+      with skip connections.
+   '''
+   for l in range(NUM_LAYERS/2):
+      skip_layer = NUM_LAYERS/2 - l - 2
+      if skip_layer == -1: break
+      if dec.get_shape().as_list()[1] < 16: fm = 1024
+      dec = tcl.convolution2d_transpose(dec, fm/2, 4, 2, activation_fn=tf.nn.relu, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_'+str(l))
+      #print 'concat',dec,'with',layers[skip_layer]
+      dec = tf.concat([dec, layers[skip_layer]], axis=3)
+      fm = fm/2
+      if dec.get_shape().as_list()[1] == 256: break
+      print 'dec:',dec
+   dec = tcl.convolution2d_transpose(dec, 3, 4, 2, activation_fn=tf.nn.relu, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_out')
+   print 'output:',dec
+   return dec
 
 def netD(x, LOSS_METHOD, reuse=False):
    print
