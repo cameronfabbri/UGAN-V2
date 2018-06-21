@@ -85,48 +85,56 @@ def sobel(x):
    x.shape[0] = height
    x.shape[1] = width
 
-   blocks: how many blocks the image is split into (1 is the whole image)
 '''
-def eme(x, blocks):
-   print 'height:',x.shape[0]
+def eme(x, window_size):
+
    print 'width:',x.shape[1]
+   print 'height:',x.shape[0]
 
    # if 4 blocks, then 2x2...etc.
-   k1 = blocks/2
-   k2 = blocks/2
+   k1 = x.shape[1]/window_size
+   k2 = x.shape[0]/window_size
 
-   w = 2/(k1*k2)
+   w = 2./(k1*k2)
 
-   blocksize_x = x.shape[1]/blocks
-   blocksize_y = x.shape[0]/blocks
+   blocksize_x = window_size
+   blocksize_y = window_size
+
    print 'blocksize_x:',blocksize_x
    print 'blocksize_y:',blocksize_y
+
+   # make sure image is divisible by window_size
+   print blocksize_x*k1
+   print blocksize_y*k2
+   x = x[:blocksize_y*k2, :blocksize_x*k1]
 
    start_x = 0
    start_y = 0
    val = 0
-   for b in range(blocks-1):
-      end_x = start_x + blocksize_x
-      end_y = start_y + blocksize_y
+   for l in range(k1):
+      for k in range(k2):
 
-      # find max and min of block
-      block = x[start_x:end_x, start_y:end_y]
-      print start_x, end_x
-      print start_y, end_y
-      print 'block_shape:',block.shape
+         #end_x = start_x + blocksize_x
+         #end_y = start_y + blocksize_y
 
-      max_ = np.max(block)
-      min_ = np.min(block)
-      print max_
-      print min_
-      print
+         # find max and min of block
+         block = x[k*window_size:window_size*(k+1), l*window_size:window_size*(l+1)]
+         print 'x,y:',x.shape[1], x.shape[0]
+         print 'block_shape:',block.shape
+         max_ = np.max(block)
+         min_ = np.min(block)
 
-      val += math.log(max_/min_)
+         #print max_
+         #print min_
 
-      start_x = end_x
-      start_y = end_y
-      
+         if min_ == 0.0: val += 0
+         elif max_ == 0.0: val += 0
+         else: val += math.log(max_/min_)
 
+         print 'val:',val
+         print
+
+   print w
    print w*val
 
    exit()
@@ -155,9 +163,9 @@ def _uism(x):
    #misc.imsave('G_edge_map.png', G_edge_map)
    #misc.imsave('B_edge_map.png', B_edge_map)
 
-   r_eme = eme(R_edge_map, 40)
-   g_eme = eme(G_edge_map, 40)
-   b_eme = eme(B_edge_map, 40)
+   r_eme = eme(R_edge_map, 10)
+   g_eme = eme(G_edge_map, 10)
+   b_eme = eme(B_edge_map, 10)
 
    exit()
 
@@ -169,6 +177,7 @@ if __name__ == '__main__':
 
    image = cv2.imread(sys.argv[1])
    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+   #image = cv2.resize(image, (256,256))
    image = image.astype(np.float32)
 
    #uicm = _uicm(image)
