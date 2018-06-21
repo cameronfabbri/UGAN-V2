@@ -3,14 +3,15 @@
    Computes the Underwater Image Quality Measure (UIQM)
 
 '''
-
+from skimage.util.shape import view_as_windows
+from skimage.util.shape import view_as_blocks
+from scipy import ndimage
 from scipy import misc
+from PIL import Image
 import numpy as np
 import math
 import sys
 import cv2
-from PIL import Image
-from scipy import ndimage
 
 '''
    Calculates the asymetric alpha-trimmed mean
@@ -80,8 +81,55 @@ def sobel(x):
 
 '''
    Enhancement measure estimation
+
+   x.shape[0] = height
+   x.shape[1] = width
+
+   blocks: how many blocks the image is split into (1 is the whole image)
 '''
-def eme():
+def eme(x, blocks):
+   print 'height:',x.shape[0]
+   print 'width:',x.shape[1]
+
+   # if 4 blocks, then 2x2...etc.
+   k1 = blocks/2
+   k2 = blocks/2
+
+   w = 2/(k1*k2)
+
+   blocksize_x = x.shape[1]/blocks
+   blocksize_y = x.shape[0]/blocks
+   print 'blocksize_x:',blocksize_x
+   print 'blocksize_y:',blocksize_y
+
+   start_x = 0
+   start_y = 0
+   val = 0
+   for b in range(blocks-1):
+      end_x = start_x + blocksize_x
+      end_y = start_y + blocksize_y
+
+      # find max and min of block
+      block = x[start_x:end_x, start_y:end_y]
+      print start_x, end_x
+      print start_y, end_y
+      print 'block_shape:',block.shape
+
+      max_ = np.max(block)
+      min_ = np.min(block)
+      print max_
+      print min_
+      print
+
+      val += math.log(max_/min_)
+
+      start_x = end_x
+      start_y = end_y
+      
+
+   print w*val
+
+   exit()
 
    weight = 2/(k1*k2)
 
@@ -99,11 +147,17 @@ def _uism(x):
    Gs = sobel(G)
    Bs = sobel(B)
 
-   edge_map = sobel(x)
+   R_edge_map = np.multiply(Rs, R)
+   G_edge_map = np.multiply(Gs, G)
+   B_edge_map = np.multiply(Bs, B)
 
-   out = edge_map*x
+   #misc.imsave('R_edge_map.png', R_edge_map)
+   #misc.imsave('G_edge_map.png', G_edge_map)
+   #misc.imsave('B_edge_map.png', B_edge_map)
 
-   misc.imsave('out.png', out)
+   r_eme = eme(R_edge_map, 40)
+   g_eme = eme(G_edge_map, 40)
+   b_eme = eme(B_edge_map, 40)
 
    exit()
 
@@ -117,7 +171,7 @@ if __name__ == '__main__':
    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
    image = image.astype(np.float32)
 
-   uicm = _uicm(image)
+   #uicm = _uicm(image)
    uism = _uism(image)
 
    print 'UICM:',uicm
