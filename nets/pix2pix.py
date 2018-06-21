@@ -48,7 +48,7 @@ def netG_decoder(layers, NUM_LAYERS):
       fm = fm/2
       if dec.get_shape().as_list()[1] == 256: break
       print 'dec:',dec
-   dec = tcl.convolution2d_transpose(dec, 3, 4, 2, activation_fn=tf.nn.relu, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_out')
+   dec = tcl.convolution2d_transpose(dec, 3, 4, 2, activation_fn=tf.nn.tanh, weights_initializer=tf.random_normal_initializer(stddev=0.02), scope='g_dec_out')
    print 'output:',dec
    return dec
 

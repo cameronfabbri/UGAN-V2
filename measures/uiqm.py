@@ -97,12 +97,7 @@ def eme(x, window_size):
    blocksize_x = window_size
    blocksize_y = window_size
 
-   #print 'blocksize_x:',blocksize_x
-   #print 'blocksize_y:',blocksize_y
-
    # make sure image is divisible by window_size
-   #print blocksize_x*k1
-   #print blocksize_y*k2
    x = x[:blocksize_y*k2, :blocksize_x*k1]
 
    start_x = 0
@@ -111,28 +106,15 @@ def eme(x, window_size):
    for l in range(k1):
       for k in range(k2):
 
-         #end_x = start_x + blocksize_x
-         #end_y = start_y + blocksize_y
-
-         # find max and min of block
          block = x[k*window_size:window_size*(k+1), l*window_size:window_size*(l+1)]
-         #print 'x,y:',x.shape[1], x.shape[0]
-         #print 'block_shape:',block.shape
          max_ = np.max(block)
          min_ = np.min(block)
-
-         #print max_
-         #print min_
 
          if min_ == 0.0: val += 0
          elif max_ == 0.0: val += 0
          else: val += math.log(max_/min_)
 
-   print w*val
-
-   exit()
-
-   weight = 2/(k1*k2)
+   return w*val
 
 '''
    Underwater Image Sharpness Measure
@@ -152,15 +134,16 @@ def _uism(x):
    G_edge_map = np.multiply(Gs, G)
    B_edge_map = np.multiply(Bs, B)
 
-   #misc.imsave('R_edge_map.png', R_edge_map)
-   #misc.imsave('G_edge_map.png', G_edge_map)
-   #misc.imsave('B_edge_map.png', B_edge_map)
-
    r_eme = eme(R_edge_map, 10)
    g_eme = eme(G_edge_map, 10)
    b_eme = eme(B_edge_map, 10)
 
-   exit()
+   lambda_r = 0.299
+   lambda_g = 0.587
+   lambda_b = 0.144
+
+   return (lambda_r*r_eme) + (lambda_g*g_eme) + (lambda_b*b_eme)
+
 
 if __name__ == '__main__':
 
@@ -173,7 +156,8 @@ if __name__ == '__main__':
    #image = cv2.resize(image, (256,256))
    image = image.astype(np.float32)
 
-   #uicm = _uicm(image)
+   uicm = _uicm(image)
    uism = _uism(image)
 
    print 'UICM:',uicm
+   print 'UISM:',uism

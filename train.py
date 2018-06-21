@@ -34,10 +34,11 @@ if __name__ == '__main__':
    parser.add_argument('--LEARNING_RATE', required=False,default=1e-4,type=float,help='Learning rate')
    parser.add_argument('--LOSS_METHOD',   required=False,default='wgan',help='Loss function for GAN')
    parser.add_argument('--BATCH_SIZE',    required=False,default=32,type=int,help='Batch size')
+   parser.add_argument('--NUM_LAYERS',    required=False,default=16,type=int,help='Number of total layers in G')
    parser.add_argument('--L1_WEIGHT',     required=False,default=100.,type=float,help='Weight for L1 loss')
-   parser.add_argument('--IG_WEIGHT',     required=False,default=1.,type=float,help='Weight for image gradient loss')
+   parser.add_argument('--IG_WEIGHT',     required=False,default=0.,type=float,help='Weight for image gradient loss')
    parser.add_argument('--NETWORK',       required=False,default='pix2pix',type=str,help='Network to use')
-   parser.add_argument('--AUGMENT',       required=False,default=0,type=int,help='Augment data or not')
+   parser.add_argument('--AUGMENT',       required=False,default=1,type=int,help='Augment data or not')
    parser.add_argument('--EPOCHS',        required=False,default=100,type=int,help='Number of epochs for GAN')
    parser.add_argument('--DATA',          required=False,default='underwater_imagenet',type=str,help='Dataset to use')
    parser.add_argument('--LAB',           required=False,default=0,type=int,help='LAB colorspace option')
@@ -46,6 +47,7 @@ if __name__ == '__main__':
    LEARNING_RATE = float(a.LEARNING_RATE)
    LOSS_METHOD   = a.LOSS_METHOD
    BATCH_SIZE    = a.BATCH_SIZE
+   NUM_LAYERS    = a.NUM_LAYERS
    L1_WEIGHT     = float(a.L1_WEIGHT)
    IG_WEIGHT     = float(a.IG_WEIGHT)
    NETWORK       = a.NETWORK
@@ -56,6 +58,7 @@ if __name__ == '__main__':
    
    EXPERIMENT_DIR  = 'checkpoints/LOSS_METHOD_'+LOSS_METHOD\
                      +'/NETWORK_'+NETWORK\
+                     +'/NUM_LAYERS_'+str(NUM_LAYERS)\
                      +'/L1_WEIGHT_'+str(L1_WEIGHT)\
                      +'/IG_WEIGHT_'+str(IG_WEIGHT)\
                      +'/AUGMENT_'+str(AUGMENT)\
@@ -75,6 +78,7 @@ if __name__ == '__main__':
    exp_info['LEARNING_RATE'] = LEARNING_RATE
    exp_info['LOSS_METHOD']   = LOSS_METHOD
    exp_info['BATCH_SIZE']    = BATCH_SIZE
+   exp_info['NUM_LAYERS']    = NUM_LAYERS
    exp_info['L1_WEIGHT']     = L1_WEIGHT
    exp_info['IG_WEIGHT']     = IG_WEIGHT
    exp_info['NETWORK']       = NETWORK
@@ -91,6 +95,7 @@ if __name__ == '__main__':
    print 'LEARNING_RATE: ',LEARNING_RATE
    print 'LOSS_METHOD:   ',LOSS_METHOD
    print 'BATCH_SIZE:    ',BATCH_SIZE
+   print 'NUM_LAYERS:    ',NUM_LAYERS
    print 'L1_WEIGHT:     ',L1_WEIGHT
    print 'IG_WEIGHT:     ',IG_WEIGHT
    print 'NETWORK:       ',NETWORK
@@ -115,10 +120,10 @@ if __name__ == '__main__':
    if LAB: image_r = rgb_to_lab(image_r)
 
    # generated corrected colors
-   layers    = netG_encoder(image_u)
-   gen_image = netG_decoder(layers)
+   layers    = netG_encoder(image_u, NUM_LAYERS)
+   gen_image = netG_decoder(layers, NUM_LAYERS)
 
-   # send 'above' water images to D
+   # send 'clean' water images to D
    D_real = netD(image_r, LOSS_METHOD)
 
    # send corrected underwater images to D
@@ -219,36 +224,44 @@ if __name__ == '__main__':
       s = time.time()
       epoch_num = step/(num_train/BATCH_SIZE)
 
+      # pick random images every time for D
+      for itr in xrange(n_critic):
+         idx = np.random.choice(np.arange(num_train), BATCH_SIZE, replace=False)
+         batchA_paths = trainA_paths[idx]
+         batchB_paths = trainB_paths[idx]
+         batchA_images = np.empty((BATCH_SIZE, 256, 256, 3), dtype=np.float32)
+         batchB_images = np.empty((BATCH_SIZE, 256, 256, 3), dtype=np.float32)
+         i = 0
+         for a,b in zip(batchA_paths, batchB_paths):
+            a_img = misc.imread(a)
+            b_img = misc.imread(b)
+            # Data augmentation here - each has 50% chance
+            if AUGMENT: a_img, b_img = data_ops.augment(a_img, b_img)
+            batchA_images[i, ...] = data_ops.preprocess(a_img)
+            batchB_images[i, ...] = data_ops.preprocess(b_img)
+            i += 1
+         sess.run(D_train_op, feed_dict={image_u:batchA_images, image_r:batchB_images})
+
+      # also get new batch for G
       idx = np.random.choice(np.arange(num_train), BATCH_SIZE, replace=False)
       batchA_paths = trainA_paths[idx]
       batchB_paths = trainB_paths[idx]
-      
       batchA_images = np.empty((BATCH_SIZE, 256, 256, 3), dtype=np.float32)
       batchB_images = np.empty((BATCH_SIZE, 256, 256, 3), dtype=np.float32)
-
       i = 0
       for a,b in zip(batchA_paths, batchB_paths):
-         a_img = data_ops.preprocess(misc.imread(a).astype('float32'))
-         b_img = data_ops.preprocess(misc.imread(b).astype('float32'))
-
+         a_img = misc.imread(a)
+         b_img = misc.imread(b)
          # Data augmentation here - each has 50% chance
-         if AUGMENT:
-
-         #misc.imsave('a_img.png', a_img)
-         #misc.imsave('b_img.png', b_img)
-         #exit()
-         batchA_images[i, ...] = a_img
-         batchB_images[i, ...] = b_img
+         if AUGMENT: a_img, b_img = data_ops.augment(a_img, b_img)
+         batchA_images[i, ...] = data_ops.preprocess(a_img)
+         batchB_images[i, ...] = data_ops.preprocess(b_img)
          i += 1
-      
-      for itr in xrange(n_critic):
-         sess.run(D_train_op, feed_dict={image_u:batchA_images, image_r:batchB_images})
-
       sess.run(G_train_op, feed_dict={image_u:batchA_images, image_r:batchB_images})
+
       D_loss, G_loss, summary = sess.run([errD, errG, merged_summary_op], feed_dict={image_u:batchA_images, image_r:batchB_images})
 
       summary_writer.add_summary(summary, step)
-
       ss = time.time()-s
       print 'epoch:',epoch_num,'step:',step,'D loss:',D_loss,'G_loss:',G_loss,'time:',ss
       step += 1

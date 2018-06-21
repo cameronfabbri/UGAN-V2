@@ -19,6 +19,7 @@ import glob
 import os
 import fnmatch
 import cPickle as pickle
+import cv2
 
 # [-1,1] -> [0, 255]
 def deprocess(x):
@@ -61,30 +62,44 @@ def augment(a_img, b_img):
    # kernel for gaussian blurring
    kernel = np.ones((5,5),np.float32)/25
    
-   r = random.random()
    # flip image left right
+   r = random.random()
    if r < 0.5:
       a_img = np.fliplr(a_img)
       b_img = np.fliplr(b_img)
    
-   r = random.random()
    # flip image up down
+   r = random.random()
    if r < 0.5:
       a_img = np.flipud(a_img)
       b_img = np.flipud(b_img)
    
-   r = random.random()
    # send in the clean image for both
+   r = random.random()
    if r < 0.5:
       a_img = b_img
 
-   r = random.random()
    # perform some gaussian blur on distorted image
+   r = random.random()
    if r < 0.5:
       a_img = cv2.filter2D(a_img,-1,kernel)
 
+   # resize to 286x286 and perform a random crop
+   r = random.random()
+   if r < 0.5:
+      a_img = misc.imresize(a_img, (286, 286,3))
+      b_img = misc.imresize(b_img, (286, 286,3))
 
+      rand_x = random.randint(0,50)
+      rand_y = random.randint(0,50)
 
+      a_img = a_img[rand_x:, rand_y:, :]
+      b_img = b_img[rand_x:, rand_y:, :]
+
+      a_img = misc.imresize(a_img, (256,256,3))
+      b_img = misc.imresize(b_img, (256,256,3))
+
+   return a_img, b_img
 
 
 def check_image(image):
