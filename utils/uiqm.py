@@ -88,9 +88,6 @@ def sobel(x):
 '''
 def eme(x, window_size):
 
-   print 'width:',x.shape[1]
-   print 'height:',x.shape[0]
-
    # if 4 blocks, then 2x2...etc.
    k1 = x.shape[1]/window_size
    k2 = x.shape[0]/window_size
@@ -100,12 +97,12 @@ def eme(x, window_size):
    blocksize_x = window_size
    blocksize_y = window_size
 
-   print 'blocksize_x:',blocksize_x
-   print 'blocksize_y:',blocksize_y
+   #print 'blocksize_x:',blocksize_x
+   #print 'blocksize_y:',blocksize_y
 
    # make sure image is divisible by window_size
-   print blocksize_x*k1
-   print blocksize_y*k2
+   #print blocksize_x*k1
+   #print blocksize_y*k2
    x = x[:blocksize_y*k2, :blocksize_x*k1]
 
    start_x = 0
@@ -119,8 +116,8 @@ def eme(x, window_size):
 
          # find max and min of block
          block = x[k*window_size:window_size*(k+1), l*window_size:window_size*(l+1)]
-         print 'x,y:',x.shape[1], x.shape[0]
-         print 'block_shape:',block.shape
+         #print 'x,y:',x.shape[1], x.shape[0]
+         #print 'block_shape:',block.shape
          max_ = np.max(block)
          min_ = np.min(block)
 
@@ -131,10 +128,6 @@ def eme(x, window_size):
          elif max_ == 0.0: val += 0
          else: val += math.log(max_/min_)
 
-         print 'val:',val
-         print
-
-   print w
    print w*val
 
    exit()
