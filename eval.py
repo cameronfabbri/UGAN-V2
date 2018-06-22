@@ -39,6 +39,7 @@ if __name__ == '__main__':
 
    LEARNING_RATE = a['LEARNING_RATE']
    LOSS_METHOD   = a['LOSS_METHOD']
+   NUM_LAYERS    = a['NUM_LAYERS']
    BATCH_SIZE    = a['BATCH_SIZE']
    L1_WEIGHT     = a['L1_WEIGHT']
    IG_WEIGHT     = a['IG_WEIGHT']
@@ -46,13 +47,15 @@ if __name__ == '__main__':
    AUGMENT       = a['AUGMENT']
    EPOCHS        = a['EPOCHS']
    DATA          = a['DATA']
-
+   
    EXPERIMENT_DIR  = 'checkpoints/LOSS_METHOD_'+LOSS_METHOD\
                      +'/NETWORK_'+NETWORK\
+                     +'/NUM_LAYERS_'+str(NUM_LAYERS)\
                      +'/L1_WEIGHT_'+str(L1_WEIGHT)\
                      +'/IG_WEIGHT_'+str(IG_WEIGHT)\
                      +'/AUGMENT_'+str(AUGMENT)\
-                     +'/DATA_'+DATA+'/'\
+                     +'/DATA_'+DATA\
+                     +'/LAB_'+str(LAB)+'/'\
 
    IMAGES_DIR     = EXPERIMENT_DIR+'test_images/'
 
@@ -82,7 +85,7 @@ if __name__ == '__main__':
    image_u = tf.placeholder(tf.float32, shape=(1, 256, 256, 3), name='image_u')
 
    # generated corrected colors
-   layers    = netG_encoder(image_u)
+   layers    = netG_encoder(image_u, NUM_LAYERS)
    gen_image = netG_decoder(layers)
 
    saver = tf.train.Saver(max_to_keep=1)
