@@ -47,6 +47,7 @@ if __name__ == '__main__':
    AUGMENT       = a['AUGMENT']
    EPOCHS        = a['EPOCHS']
    DATA          = a['DATA']
+   LAB           = a['LAB']
    
    EXPERIMENT_DIR  = 'checkpoints/LOSS_METHOD_'+LOSS_METHOD\
                      +'/NETWORK_'+NETWORK\
@@ -86,7 +87,7 @@ if __name__ == '__main__':
 
    # generated corrected colors
    layers    = netG_encoder(image_u, NUM_LAYERS)
-   gen_image = netG_decoder(layers)
+   gen_image = netG_decoder(layers, NUM_LAYERS)
 
    saver = tf.train.Saver(max_to_keep=1)
 
