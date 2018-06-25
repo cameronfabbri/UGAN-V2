@@ -59,6 +59,10 @@ def augment(image, brightness):
 '''
 def augment(a_img, b_img):
 
+   # randomly interpolate
+   a = random.random()
+   a_img = a_img*(1-a) + b_img*a
+
    # kernel for gaussian blurring
    kernel = np.ones((5,5),np.float32)/25
    

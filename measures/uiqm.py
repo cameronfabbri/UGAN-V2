@@ -2,6 +2,10 @@
 
    Computes the Underwater Image Quality Measure (UIQM)
 
+   I changed the UIConM (Underwater Image Contrast Measure) because the formula
+   they gave using the PLIP operations wasn't working. I used the same measure
+   however, the LogAMEE from here: https://www.hindawi.com/journals/ijbi/2016/4710842/
+
 '''
 from skimage.util.shape import view_as_windows
 from skimage.util.shape import view_as_blocks
@@ -39,11 +43,9 @@ def mu_a(x, alpha_L=0.1, alpha_R=0.1):
    return val
 
 def s_a(x, mu):
-
    val = 0
    for pixel in x:
       val += math.pow((pixel-mu), 2)
-
    return val/len(x)
 
 def _uicm(x):
@@ -58,14 +60,8 @@ def _uicm(x):
    mu_a_RG = mu_a(RG)
    mu_a_YB = mu_a(YB)
 
-   #print 'mu_a_RG:',mu_a_RG
-   #print 'mu_a_YB:',mu_a_YB
-
    s_a_RG = s_a(RG, mu_a_RG)
    s_a_YB = s_a(YB, mu_a_YB)
-
-   #print 's_a_RG:',s_a_RG
-   #print 's_a_YB:',s_a_YB
 
    l = math.sqrt( (math.pow(mu_a_RG,2)+math.pow(mu_a_YB,2)) )
    r = math.sqrt(s_a_RG+s_a_YB)
@@ -258,12 +254,20 @@ if __name__ == '__main__':
    print 'UIConM:',uiconm
    print
 
+   # from paper https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7305804
    c1 = 0.0282
    c2 = 0.2953
    c3 = 3.5753
 
+   # my own
+   c1 = 0.2
+   c2 = 0.3
+   c3 = 1.0
+
+   # from https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7300447
+   c1 = 0.4680
+   c2 = 0.2745
+   c3 = 0.2576
+
    uiqm = (c1*uicm) + (c2*uism) + (c3*uiconm)
    print 'UIQM:',uiqm
-
-
-

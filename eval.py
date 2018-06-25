@@ -86,8 +86,12 @@ if __name__ == '__main__':
    image_u = tf.placeholder(tf.float32, shape=(1, 256, 256, 3), name='image_u')
 
    # generated corrected colors
-   layers    = netG_encoder(image_u, NUM_LAYERS)
-   gen_image = netG_decoder(layers, NUM_LAYERS)
+   if NUM_LAYERS == 16:
+      layers    = netG16_encoder(image_u)
+      gen_image = netG16_decoder(layers)
+   if NUM_LAYERS == 8:
+      layers    = netG8_encoder(image_u)
+      gen_image = netG8_decoder(layers)
 
    saver = tf.train.Saver(max_to_keep=1)
 

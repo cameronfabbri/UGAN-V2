@@ -216,17 +216,18 @@ if __name__ == '__main__':
 
    print len(trainB_paths),'training pairs'
    num_train = len(trainB_paths)
+   # flip up down, flip left right, send in clean, blur, interpolate
    num_test  = len(test_paths)
 
    n_critic = 1
    if LOSS_METHOD == 'wgan': n_critic = 5
 
-   epoch_num = step/(num_train/BATCH_SIZE)
+   epoch_num = step/(num_train*2*2*2*2*5/BATCH_SIZE)
 
 
    while epoch_num < EPOCHS:
       s = time.time()
-      epoch_num = step/(num_train/BATCH_SIZE)
+      epoch_num = step/(num_train*2*2*2*2*5/BATCH_SIZE)
 
       # pick random images every time for D
       for itr in xrange(n_critic):
