@@ -149,7 +149,6 @@ def _uism(x):
 
 def plip_g(x,mu=1026.0):
    return mu-x
-   return x
 
 def plip_theta(g1, g2, k):
    g1 = plip_g(g1)
@@ -164,6 +163,21 @@ def plip_cross(g1, g2, gamma):
 def plip_diag(c, g, gamma):
    g = plip_g(g)
    return gamma - (gamma * math.pow((1 - (g/gamma) ), c) )
+
+def plip_multiplication(g1, g2):
+   return plip_phiInverse(plip_phi(g1) * plip_phi(g2))
+
+   return plip_phiInverse(plip_phi(plip_g(g1)) * plip_phi(plip_g(g2)))
+
+def plip_phiInverse(g):
+   plip_lambda = 1026.0
+   plip_beta   = 1.0
+   return plip_lambda * (1 - math.pow(math.exp(-g / plip_lambda), 1 / plip_beta));
+
+def plip_phi(g):
+   plip_lambda = 1026.0
+   plip_beta   = 1.0
+   return -plip_lambda * math.pow(math.log(1 - g / plip_lambda), plip_beta)
 
 
 '''
@@ -187,13 +201,16 @@ def _uiconm(x, window_size):
    k2 = x.shape[0]/window_size
 
    # weight
-   w = 1./(k1*k2)
+   w = -1./(k1*k2)
 
    blocksize_x = window_size
    blocksize_y = window_size
 
    # make sure image is divisible by window_size - doesn't matter if we cut out some pixels
    x = x[:blocksize_y*k2, :blocksize_x*k1]
+
+   # entropy scale - higher helps with randomness
+   alpha = 1
 
    val = 0
    for l in range(k1):
@@ -202,17 +219,23 @@ def _uiconm(x, window_size):
          max_ = np.max(block)
          min_ = np.min(block)
 
-         top = plip_theta(max_, min_, plip_k)
-         bot = plip_cross(max_, min_, plip_gamma)
-         print top
-         print bot
-         print
+         #top = plip_theta(max_, min_, plip_k)
+         #bot = plip_cross(max_, min_, plip_gamma)
+         #print top
+         #print bot
+         #print
 
-         try: val += (top/bot) * math.log(top/bot)
+         top = max_-min_
+         bot = max_+min_
+
+         try: val += alpha*math.pow((top/bot),alpha) * math.log(top/bot)
          except: val += 0.0
+         
+         #try: val += plip_multiplication((top/bot),math.log(top/bot))
 
 
-   return plip_diag(w, val, plip_gamma)
+   #return plip_diag(w, val, plip_gamma)
+   return w*val
 
 
 
@@ -233,7 +256,14 @@ if __name__ == '__main__':
    print 'UICM:',uicm
    print 'UISM:',uism
    print 'UIConM:',uiconm
+   print
 
+   c1 = 0.0282
+   c2 = 0.2953
+   c3 = 3.5753
+
+   uiqm = (c1*uicm) + (c2*uism) + (c3*uiconm)
+   print 'UIQM:',uiqm
 
 
 
