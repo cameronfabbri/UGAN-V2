@@ -120,8 +120,12 @@ if __name__ == '__main__':
    if LAB: image_r = rgb_to_lab(image_r)
 
    # generated corrected colors
-   layers    = netG_encoder(image_u, NUM_LAYERS)
-   gen_image = netG_decoder(layers, NUM_LAYERS)
+   if NUM_LAYERS == 16:
+      layers     = netG16_encoder(image_u)
+      gen_image  = netG16_decoder(layers)
+   if NUM_LAYERS == 8:
+      layers     = netG8_encoder(image_u)
+      gen_image  = netG8_decoder(layers)
 
    # send 'clean' water images to D
    D_real = netD(image_r, LOSS_METHOD)
