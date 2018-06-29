@@ -11,11 +11,15 @@ from skimage.util.shape import view_as_windows
 from skimage.util.shape import view_as_blocks
 from scipy import ndimage
 from scipy import misc
+from tqdm import tqdm
 from PIL import Image
 import numpy as np
+import argparse
+import fnmatch
 import math
 import sys
 import cv2
+import os
 
 '''
    Calculates the asymetric alpha-trimmed mean
@@ -233,41 +237,79 @@ def _uiconm(x, window_size):
    #return plip_diag(w, val, plip_gamma)
    return w*val
 
+def getPaths(data_dir):
+   exts = ['*.png','*.PNG','*.JPG','*.JPEG','*.jpg','*.jpeg']
+   image_paths = []
+   for pattern in exts:
+      for d, s, fList in os.walk(data_dir):
+         for filename in fList:
+            if fnmatch.fnmatch(filename, pattern):
+               fname_ = os.path.join(d,filename)
+               image_paths.append(fname_)
+   return image_paths
 
 
 if __name__ == '__main__':
 
-   if len(sys.argv) < 2:
-      print 'Usage: python uiqm.py [image]'
+   parser = argparse.ArgumentParser()
+   parser.add_argument('--image', required=False,type=str,help='Image to perform metric on')
+   parser.add_argument('--directory',   required=False,type=str,help='Directory of images to perform average metric on')
+   a = parser.parse_args()
+
+   image     = a.image
+   directory = a.directory
+
+   if image is not None and directory is not None:
+      print 'Only provide one'
       exit()
 
-   image = cv2.imread(sys.argv[1])
-   image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-   image = image.astype(np.float32)
+   if image is not None:
+      images = [image]
 
-   uicm   = _uicm(image)
-   uism   = _uism(image)
-   uiconm = _uiconm(image, 10)
-
-   print 'UICM:',uicm
-   print 'UISM:',uism
-   print 'UIConM:',uiconm
-   print
-
-   # from paper https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7305804
-   c1 = 0.0282
-   c2 = 0.2953
-   c3 = 3.5753
-
-   # my own
-   c1 = 0.2
-   c2 = 0.3
-   c3 = 1.0
-
+   if directory is not None:
+      images = getPaths(directory)
+      
+      
    # from https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7300447
    c1 = 0.4680
    c2 = 0.2745
    c3 = 0.2576
 
-   uiqm = (c1*uicm) + (c2*uism) + (c3*uiconm)
-   print 'UIQM:',uiqm
+   total_uiqm = 0.0
+   count = 0
+
+   print 'Computing average UIQM...'
+   for image in tqdm(images):
+
+      image = cv2.imread(image)
+      image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+      image = image.astype(np.float32)
+
+      uicm   = _uicm(image)
+      uism   = _uism(image)
+      uiconm = _uiconm(image, 10)
+
+      '''
+      print 'UICM:',uicm
+      print 'UISM:',uism
+      print 'UIConM:',uiconm
+      print
+      '''
+
+      # from paper https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7305804
+      #c1 = 0.0282
+      #c2 = 0.2953
+      #c3 = 3.5753
+
+      # my own
+      #c1 = 0.2
+      #c2 = 0.3
+      #c3 = 1.0
+
+      uiqm = (c1*uicm) + (c2*uism) + (c3*uiconm)
+      #print 'UIQM:',uiqm
+      total_uiqm += uiqm
+
+      count += 1
+
+   print float(total_uiqm)/float(count)
