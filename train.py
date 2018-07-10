@@ -38,7 +38,7 @@ if __name__ == '__main__':
    parser.add_argument('--L1_WEIGHT',     required=False,default=100.,type=float,help='Weight for L1 loss')
    parser.add_argument('--IG_WEIGHT',     required=False,default=0.,type=float,help='Weight for image gradient loss')
    parser.add_argument('--NETWORK',       required=False,default='pix2pix',type=str,help='Network to use')
-   parser.add_argument('--AUGMENT',       required=False,default=1,type=int,help='Augment data or not')
+   parser.add_argument('--AUGMENT',       required=False,default=0,type=int,help='Augment data or not')
    parser.add_argument('--EPOCHS',        required=False,default=100,type=int,help='Number of epochs for GAN')
    parser.add_argument('--DATA',          required=False,default='underwater_imagenet',type=str,help='Dataset to use')
    parser.add_argument('--LAB',           required=False,default=0,type=int,help='LAB colorspace option')
