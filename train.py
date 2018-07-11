@@ -218,18 +218,15 @@ if __name__ == '__main__':
 
    merged_summary_op = tf.summary.merge_all()
 
-   # underwater photos
-   trainA_paths = data_ops.getPaths('datasets/'+DATA+'/trainA/')
-   # normal photos (ground truth)
-   trainB_paths = data_ops.getPaths('datasets/'+DATA+'/trainB/')
-   # testing paths
-   test_paths = np.asarray(glob.glob('datasets/'+DATA+'/test/*.jpg'))
-   #test_paths = np.asarray(glob.glob('datasets/'+DATA+'/trainA/*.jpg'))
+   trainA_paths = data_ops.getPaths('datasets/'+DATA+'/trainA/') # underwater photos
+   trainB_paths = data_ops.getPaths('datasets/'+DATA+'/trainB/') # normal photos (ground truth)
+   test_paths   = data_ops.getPaths('datasets/'+DATA+'/test/')
+   val_paths    = data_ops.getPaths('datasets/'+DATA+'/val/')
 
    print len(trainB_paths),'training pairs'
    num_train = len(trainA_paths)
-   # flip up down, flip left right, send in clean, blur, interpolate
    num_test  = len(test_paths)
+   num_val   = len(val_paths)
 
    n_critic = 1
    if LOSS_METHOD == 'wgan': n_critic = 5
@@ -239,9 +236,7 @@ if __name__ == '__main__':
    while epoch_num < EPOCHS:
       s = time.time()
       epoch_num = step/(num_train/BATCH_SIZE)
-
       uiqms = []
-
       # pick random images every time for D
       for itr in xrange(n_critic):
          idx = np.random.choice(np.arange(num_train), BATCH_SIZE, replace=False)
@@ -304,26 +299,24 @@ if __name__ == '__main__':
          saver.save(sess, EXPERIMENT_DIR+'checkpoint-'+str(step))
          saver.export_meta_graph(EXPERIMENT_DIR+'checkpoint-'+str(step)+'.meta')
          print 'Model saved\n'
-
-         idx = np.random.choice(np.arange(num_test), BATCH_SIZE, replace=False)
-         batch_paths = test_paths[idx]
-         
+         idx = np.random.choice(np.arange(num_val), BATCH_SIZE, replace=False)
+         batch_paths  = val_paths[idx]
          batch_images = np.empty((BATCH_SIZE, 256, 256, 3), dtype=np.float32)
-
-         print 'Testing...'
+         print 'Testing on val split...'
          i = 0
          for a in batch_paths:
             a_img = misc.imread(a).astype('float32')
             a_img = data_ops.preprocess(misc.imresize(a_img, (256, 256, 3)))
             batch_images[i, ...] = a_img
             i += 1
-
          gen_images = np.asarray(sess.run(gen_image, feed_dict={image_u:batch_images}))
-
          c = 0
+         val_uiqms = []
          for gen, real in zip(gen_images, batch_images):
+            img_uiqm = uiqm.getUIQM(data_ops.deprocess(uimg))
+            val_uiqms.append(img_uiqm)
             misc.imsave(IMAGES_DIR+str(step)+'_real.png', real)
             misc.imsave(IMAGES_DIR+str(step)+'_gen.png', gen)
             c += 1
             if c == 5: break
-         print 'Done with test images'
+         print 'Done with val images, average uiqm:',np.mean(np.asarray(val_uiqms))
