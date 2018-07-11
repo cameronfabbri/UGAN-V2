@@ -296,8 +296,9 @@ if __name__ == '__main__':
    print 'Computing average UIQM...'
    for image in tqdm(images):
 
-      image = cv2.imread(image)
-      image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+      #image = cv2.imread(image)
+      #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+      image = misc.imread(image)
       image = image.astype(np.float32)
 
       uicm   = _uicm(image)
