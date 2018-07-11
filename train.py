@@ -25,14 +25,17 @@ import os
 
 # my imports
 sys.path.insert(0, 'ops/')
+sys.path.insert(0, 'measures/')
 sys.path.insert(0, 'nets/')
 from tf_ops import *
 import data_ops
+import uiqm
 
 if __name__ == '__main__':
    parser = argparse.ArgumentParser()
    parser.add_argument('--LEARNING_RATE', required=False,default=1e-4,type=float,help='Learning rate')
    parser.add_argument('--LOSS_METHOD',   required=False,default='wgan',help='Loss function for GAN')
+   parser.add_argument('--UIQM_WEIGHT',   required=False,default=0.0,type=float,help='UIQM loss weight')
    parser.add_argument('--BATCH_SIZE',    required=False,default=32,type=int,help='Batch size')
    parser.add_argument('--NUM_LAYERS',    required=False,default=16,type=int,help='Number of total layers in G')
    parser.add_argument('--L1_WEIGHT',     required=False,default=100.,type=float,help='Weight for L1 loss')
@@ -40,11 +43,12 @@ if __name__ == '__main__':
    parser.add_argument('--NETWORK',       required=False,default='pix2pix',type=str,help='Network to use')
    parser.add_argument('--AUGMENT',       required=False,default=0,type=int,help='Augment data or not')
    parser.add_argument('--EPOCHS',        required=False,default=100,type=int,help='Number of epochs for GAN')
-   parser.add_argument('--DATA',          required=False,default='underwater_imagenet',type=str,help='Dataset to use')
+   parser.add_argument('--DATA',          required=False,default='large',type=str,help='Dataset to use')
    parser.add_argument('--LAB',           required=False,default=0,type=int,help='LAB colorspace option')
    a = parser.parse_args()
 
    LEARNING_RATE = float(a.LEARNING_RATE)
+   UIQM_WEIGHT   = a.UIQM_WEIGHT
    LOSS_METHOD   = a.LOSS_METHOD
    BATCH_SIZE    = a.BATCH_SIZE
    NUM_LAYERS    = a.NUM_LAYERS
@@ -58,6 +62,7 @@ if __name__ == '__main__':
    
    EXPERIMENT_DIR  = 'checkpoints/LOSS_METHOD_'+LOSS_METHOD\
                      +'/NETWORK_'+NETWORK\
+                     +'/UIQM_WEIGHT_'+str(UIQM_WEIGHT)\
                      +'/NUM_LAYERS_'+str(NUM_LAYERS)\
                      +'/L1_WEIGHT_'+str(L1_WEIGHT)\
                      +'/IG_WEIGHT_'+str(IG_WEIGHT)\
@@ -77,6 +82,7 @@ if __name__ == '__main__':
    exp_info = dict()
    exp_info['LEARNING_RATE'] = LEARNING_RATE
    exp_info['LOSS_METHOD']   = LOSS_METHOD
+   exp_info['UIQM_WEIGHT']   = UIQM_WEIGHT
    exp_info['BATCH_SIZE']    = BATCH_SIZE
    exp_info['NUM_LAYERS']    = NUM_LAYERS
    exp_info['L1_WEIGHT']     = L1_WEIGHT
@@ -113,11 +119,9 @@ if __name__ == '__main__':
 
    # underwater image
    image_u = tf.placeholder(tf.float32, shape=(BATCH_SIZE, 256, 256, 3), name='image_u')
-   if LAB: image_u = rgb_to_lab(image_u)
 
    # correct image
    image_r = tf.placeholder(tf.float32, shape=(BATCH_SIZE, 256, 256, 3), name='image_r')
-   if LAB: image_r = rgb_to_lab(image_r)
 
    # generated corrected colors
    if NUM_LAYERS == 16:
@@ -168,12 +172,20 @@ if __name__ == '__main__':
       ig_loss = loss_gradient_difference(image_r, image_u)
       errG += IG_WEIGHT*ig_loss
 
+   if UIQM_WEIGHT > 0.0:
+      uiqm_val  = tf.placeholder(tf.float32, shape=(), name='uiqm_val')
+      # this is - because we want to maximize the uiqm, so minimize the negative of it (subtract it)
+      uiqm_loss = -UIQM_WEIGHT*uiqm_val
+      errG += uiqm_loss
+
    # tensorboard summaries
    tf.summary.scalar('d_loss', tf.reduce_mean(errD))
    tf.summary.scalar('g_loss', tf.reduce_mean(errG))
    try: tf.summary.scalar('l1_loss', tf.reduce_mean(l1_loss))
    except: pass
    try: tf.summary.scalar('ig_loss', tf.reduce_mean(ig_loss))
+   except: pass
+   try: tf.summary.scalar('uiqm_loss', tf.reduce_mean(uiqm_loss))
    except: pass
 
    # get all trainable variables, and split by network G and network D
@@ -207,27 +219,28 @@ if __name__ == '__main__':
    merged_summary_op = tf.summary.merge_all()
 
    # underwater photos
-   trainA_paths = np.asarray(glob.glob('datasets/'+DATA+'/trainA/*.jpg'))
+   trainA_paths = data_ops.getPaths('datasets/'+DATA+'/trainA/')
    # normal photos (ground truth)
-   trainB_paths = np.asarray(glob.glob('datasets/'+DATA+'/trainB/*.jpg'))
+   trainB_paths = data_ops.getPaths('datasets/'+DATA+'/trainB/')
    # testing paths
    test_paths = np.asarray(glob.glob('datasets/'+DATA+'/test/*.jpg'))
    #test_paths = np.asarray(glob.glob('datasets/'+DATA+'/trainA/*.jpg'))
 
    print len(trainB_paths),'training pairs'
-   num_train = len(trainB_paths)
+   num_train = len(trainA_paths)
    # flip up down, flip left right, send in clean, blur, interpolate
    num_test  = len(test_paths)
 
    n_critic = 1
    if LOSS_METHOD == 'wgan': n_critic = 5
 
-   epoch_num = step/(num_train*2*2*2*2*5/BATCH_SIZE)
-
+   epoch_num = step/(num_train/BATCH_SIZE)
 
    while epoch_num < EPOCHS:
       s = time.time()
-      epoch_num = step/(num_train*2*2*2*2*5/BATCH_SIZE)
+      epoch_num = step/(num_train/BATCH_SIZE)
+
+      uiqms = []
 
       # pick random images every time for D
       for itr in xrange(n_critic):
@@ -240,6 +253,7 @@ if __name__ == '__main__':
          for a,b in zip(batchA_paths, batchB_paths):
             a_img = misc.imread(a)
             b_img = misc.imread(b)
+
             # Data augmentation here - each has 50% chance
             if AUGMENT: a_img, b_img = data_ops.augment(a_img, b_img)
             batchA_images[i, ...] = data_ops.preprocess(a_img)
@@ -262,13 +276,27 @@ if __name__ == '__main__':
          batchA_images[i, ...] = data_ops.preprocess(a_img)
          batchB_images[i, ...] = data_ops.preprocess(b_img)
          i += 1
-      sess.run(G_train_op, feed_dict={image_u:batchA_images, image_r:batchB_images})
 
-      D_loss, G_loss, summary = sess.run([errD, errG, merged_summary_op], feed_dict={image_u:batchA_images, image_r:batchB_images})
+      # calculate uiqm for each image generated by the generator - want to maximize this
+      if UIQM_WEIGHT > 0.0:
+         uiqm_gen_imgs = sess.run(gen_image, feed_dict={image_u:batchA_images})
+         for uimg in uiqm_gen_imgs:
+            img_uiqm = uiqm.getUIQM(data_ops.deprocess(uimg))
+            uiqms.append(img_uiqm)
+         avg_uiqm = np.mean(uiqms)
+         sess.run(G_train_op, feed_dict={image_u:batchA_images, image_r:batchB_images,uiqm_val:avg_uiqm})
+         D_loss, G_loss, summary = sess.run([errD, errG, merged_summary_op], feed_dict={image_u:batchA_images, image_r:batchB_images,uiqm_val:avg_uiqm})
+      else:
+         sess.run(G_train_op, feed_dict={image_u:batchA_images, image_r:batchB_images})
+         D_loss, G_loss, summary = sess.run([errD, errG, merged_summary_op], feed_dict={image_u:batchA_images, image_r:batchB_images})
 
       summary_writer.add_summary(summary, step)
       ss = time.time()-s
-      print 'epoch:',epoch_num,'step:',step,'D loss:',D_loss,'G_loss:',G_loss,'time:',ss
+
+      if UIQM_WEIGHT > 0.0:
+         print 'epoch:',epoch_num,'step:',step,'D loss:',D_loss,'G_loss:',G_loss,'UIQM:',avg_uiqm,'time:',ss
+      else:
+         print 'epoch:',epoch_num,'step:',step,'D loss:',D_loss,'G_loss:',G_loss,'time:',ss
       step += 1
       
       if step%500 == 0:
