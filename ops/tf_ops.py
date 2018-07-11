@@ -1,17 +1,17 @@
 '''
 
-   Operations commonly used in tensorflow
+   Operations commonly used in tensorflow, as well as some I need.
 
 '''
 
 import tensorflow as tf
+import tensorflow.contrib.layers as tcl
 import numpy as np
 import math
 
+
 '''
-
   Image Gradient Difference Loss (GDL) as seen in https://arxiv.org/abs/1511.05440
-
 '''
 def loss_gradient_difference(true, generated):
    true_x_shifted_right = true[:,1:,:,:]
@@ -36,51 +36,6 @@ def loss_gradient_difference(true, generated):
 
    loss = loss_x_gradient + loss_y_gradient
    return loss
-
-''' 
-   Phase shift. PS is the phase shift function and _phase_shift is a helper
-   https://github.com/tetrachrome/subpixel 
-'''
-def _phase_shift(I, r):
-  bsize, a, b, c = I.get_shape().as_list()
-  bsize = tf.shape(I)[0] # Handling Dimension(None) type for undefined batch dim
-  X = tf.reshape(I, (bsize, a, b, r, r))
-  X = tf.transpose(X, (0, 1, 2, 4, 3))  # bsize, a, b, 1, 1
-  X = tf.split(X, a, 1)  # a, [bsize, b, r, r]
-  X = tf.concat(2, [tf.squeeze(x) for x in X])  # bsize, b, a*r, r
-  X = tf.split(X, b, 1)  # b, [bsize, a*r, r]
-  X = tf.concat(2, [tf.squeeze(x) for x in X])  # bsize, a*r, b*r
-  return tf.reshape(X, (bsize, a*r, b*r, 1))
-
-def PS(X, r, depth):
-  # X: input tensor of shape [batch, height, width, depth]
-  # r: upsampleing ratio. 2 for doubleing the size 
-  # depth: num channels of output
-  #    Example: 
-  #      X = [batch, 32, 32, 16]
-  #      Y = PS(X, 2, 4)
-  #      Y -> [batch, 64, 64, 4] 
-  Xc = tf.split(3, depth, X)
-  X = tf.concat(3, [_phase_shift(x, r) for x in Xc])
-  return X
-
-
-'''
-   Kullback Leibler divergence
-   https://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence
-   https://github.com/fastforwardlabs/vae-tf/blob/master/vae.py#L178
-'''
-def kullbackleibler(mu, log_sigma):
-   return -0.5*tf.reduce_sum(1+2*log_sigma-mu**2-tf.exp(2*log_sigma),1)
-
-
-'''
-   Batch normalization
-   https://arxiv.org/abs/1502.03167
-'''
-def bn(x):
-   return tf.layers.batch_normalization(x)
-
 
 '''
    Layer normalizes a 2D tensor along its second axis, which corresponds to batch
@@ -121,40 +76,6 @@ def upconv2d(x, filters, name=None, new_height=None, new_width=None, kernel_size
 
    # conv with stride 1
    return tf.layers.conv2d(x_resize, filters, kernel_size, strides=1, name=name)
-
-'''
-   3d transpose convolution, but resizing first then performing conv2d with stride 1
-
-   The 5D tensor needs to be converted to the size resize_images needs, which is 4D
-   help from: https://stackoverflow.com/questions/43851999/resize-3d-image-with-5d-tensor-in-tensorflow
-
-   Assumes input tensor is (BATCH, HEIGHT, WIDTH, DEPTH, CHANNELS)
-   where DEPTH can be time or something. For example, 4 stacked
-   images that have 3 color channels, height and width of 256 with batch size of 1 would
-   be (1, 256, 256, 4, 3)
-   
-'''
-# TODO testing, not sure if this works correctly yet
-def upconv3d(x, filters, name, kernel_size=[1,1,1]):
-   
-   # get original depth, height, and width of the volume
-   shapes = x.get_shape().as_list()
-   depth  = shapes[1]
-   height = shapes[2]
-   width  = shapes[3]
-
-   x = tf.reshape(x, [shapes[0]*shapes[1], shapes[2], shapes[3], shapes[4]])
-
-   new_size = tf.constant([height*2, width*2])
-   resized = tf.image.resize_images(x, new_size)
-
-   # now put back to 5D
-   x = tf.reshape(resized, [shapes[0], shapes[1], height*2, width*2, shapes[4]])
-
-   # now conv with stride 1
-   out = tf.layers.conv3d(x, filters, kernel_size, strides=(1,1,1), name=name)
-   return out
-
 
 
 '''

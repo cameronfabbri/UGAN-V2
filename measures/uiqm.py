@@ -248,6 +248,21 @@ def getPaths(data_dir):
                image_paths.append(fname_)
    return image_paths
 
+'''
+   Function to return UIQM to be called from other programs
+
+   x: image
+'''
+def getUIQM(x):
+   x = x.astype(np.float32)
+   c1 = 0.4680
+   c2 = 0.2745
+   c3 = 0.2576
+   uicm   = _uicm(x)
+   uism   = _uism(x)
+   uiconm = _uiconm(x, 10)
+   uiqm = (c1*uicm) + (c2*uism) + (c3*uiconm)
+   return uiqm
 
 if __name__ == '__main__':
 
@@ -289,12 +304,11 @@ if __name__ == '__main__':
       uism   = _uism(image)
       uiconm = _uiconm(image, 10)
 
-      '''
-      print 'UICM:',uicm
-      print 'UISM:',uism
-      print 'UIConM:',uiconm
-      print
-      '''
+      if directory is None:
+         print 'UICM:',uicm
+         print 'UISM:',uism
+         print 'UIConM:',uiconm
+         print
 
       # from paper https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7305804
       #c1 = 0.0282
