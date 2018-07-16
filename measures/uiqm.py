@@ -228,8 +228,12 @@ def _uiconm(x, window_size):
          top = max_-min_
          bot = max_+min_
 
-         try: val += alpha*math.pow((top/bot),alpha) * math.log(top/bot)
-         except: val += 0.0
+
+         #print 'top:',top
+         #print 'bot:',bot
+         #print
+         if math.isnan(top) or math.isnan(bot) or bot == 0.0 or top == 0.0: val += 0.0
+         else: val += alpha*math.pow((top/bot),alpha) * math.log(top/bot)
          
          #try: val += plip_multiplication((top/bot),math.log(top/bot))
 
