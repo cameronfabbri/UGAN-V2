@@ -34,11 +34,15 @@ if __name__ == '__main__':
       print 'You must provide an info.pkl file'
       exit()
 
+   t__ = open('/home/fabbric/Research/UGAN-V2/fps.txt','w')
+   t__.close()
+   
    pkl_file = open(sys.argv[1], 'rb')
    a = pickle.load(pkl_file)
 
    LEARNING_RATE = a['LEARNING_RATE']
    LOSS_METHOD   = a['LOSS_METHOD']
+   UIQM_WEIGHT   = a['UIQM_WEIGHT']
    NUM_LAYERS    = a['NUM_LAYERS']
    BATCH_SIZE    = a['BATCH_SIZE']
    L1_WEIGHT     = a['L1_WEIGHT']
@@ -51,6 +55,7 @@ if __name__ == '__main__':
    
    EXPERIMENT_DIR  = 'checkpoints/LOSS_METHOD_'+LOSS_METHOD\
                      +'/NETWORK_'+NETWORK\
+                     +'/UIQM_WEIGHT_'+str(UIQM_WEIGHT)\
                      +'/NUM_LAYERS_'+str(NUM_LAYERS)\
                      +'/L1_WEIGHT_'+str(L1_WEIGHT)\
                      +'/IG_WEIGHT_'+str(IG_WEIGHT)\
@@ -63,6 +68,11 @@ if __name__ == '__main__':
    print
    print 'Creating',IMAGES_DIR
    try: os.makedirs(IMAGES_DIR)
+   except: pass
+
+   try:os.makedirs(IMAGES_DIR+'gen/')
+   except: pass
+   try:os.makedirs(IMAGES_DIR+'real/')
    except: pass
 
    print
@@ -89,9 +99,18 @@ if __name__ == '__main__':
    if NUM_LAYERS == 16:
       layers    = netG16_encoder(image_u)
       gen_image = netG16_decoder(layers)
+   if NUM_LAYERS == 12:
+      layers    = netG12_encoder(image_u)
+      gen_image = netG12_decoder(layers)
+   if NUM_LAYERS == 10:
+      layers    = netG10_encoder(image_u)
+      gen_image = netG10_decoder(layers)
    if NUM_LAYERS == 8:
       layers    = netG8_encoder(image_u)
       gen_image = netG8_decoder(layers)
+   if NUM_LAYERS == 4:
+      layers    = netG4_encoder(image_u)
+      gen_image = netG4_decoder(layers)
 
    saver = tf.train.Saver(max_to_keep=1)
 
@@ -142,11 +161,17 @@ if __name__ == '__main__':
       times.append(tot)
 
       for gen, real in zip(gen_images, batch_images):
-         misc.imsave(IMAGES_DIR+img_name+'_real.png', real)
-         misc.imsave(IMAGES_DIR+img_name+'_gen.png', gen)
+         misc.imsave(IMAGES_DIR+'real/'+img_name+'_real.png', real)
+         misc.imsave(IMAGES_DIR+'gen/'+img_name+'_gen.png', gen)
 
    avg_time = float(np.mean(np.asarray(times)))
    print
+   print EXPERIMENT_DIR
    print 'average time:',avg_time
    print 'fps:',1.0/avg_time
    print
+
+   with open('/home/fabbric/Research/UGAN-V2/fps.txt','a') as f:
+      f.write(EXPERIMENT_DIR+'\n')
+      f.write('average time:'+str(avg_time)+'\n')
+      f.write('fps:'+str(1.0/avg_time)+'\n'+'\n')
