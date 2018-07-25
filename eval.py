@@ -34,9 +34,6 @@ if __name__ == '__main__':
       print 'You must provide an info.pkl file'
       exit()
 
-   t__ = open('/home/fabbric/Research/UGAN-V2/fps.txt','w')
-   t__.close()
-   
    pkl_file = open(sys.argv[1], 'rb')
    a = pickle.load(pkl_file)
 
@@ -156,10 +153,10 @@ if __name__ == '__main__':
       batch_images[0, ...] = a_img
 
       s = time.time()
-      gen_images = np.asarray(sess.run(gen_image, feed_dict={image_u:batch_images}))
+      gen_images = sess.run(gen_image, feed_dict={image_u:batch_images})
       tot = time.time()-s
       times.append(tot)
-
+      gen_images = np.asarray(gen_images)
       for gen, real in zip(gen_images, batch_images):
          misc.imsave(IMAGES_DIR+'real/'+img_name+'_real.png', real)
          misc.imsave(IMAGES_DIR+'gen/'+img_name+'_gen.png', gen)
